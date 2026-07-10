@@ -18,6 +18,8 @@ type AppSettings struct {
 	ImportMode         string `json:"importMode"` // "copy" | "reference"
 	LibraryDir         string `json:"libraryDir"`
 	RemotePathTemplate string `json:"remotePathTemplate"`
+	OPDSEnabled        bool   `json:"opdsEnabled"`
+	OPDSPort           int    `json:"opdsPort"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
@@ -25,6 +27,8 @@ func toAppSettings(s settings.Settings) AppSettings {
 		ImportMode:         string(s.ImportMode),
 		LibraryDir:         s.LibraryDir,
 		RemotePathTemplate: s.RemotePathTemplate,
+		OPDSEnabled:        s.OPDSEnabled,
+		OPDSPort:           s.OPDSPort,
 	}
 }
 

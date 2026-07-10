@@ -3,10 +3,12 @@
 
 import * as App from "./app.js";
 import * as LibraryService from "./libraryservice.js";
+import * as OPDSService from "./opdsservice.js";
 import * as SettingsService from "./settingsservice.js";
 export {
     App,
     LibraryService,
+    OPDSService,
     SettingsService
 };
 
@@ -22,6 +24,7 @@ export type {
     ImportProgress,
     ImportSummary,
     LibraryStats,
+    OPDSStatus,
     PingResult,
     RemoveBookResult,
     SidebarItem

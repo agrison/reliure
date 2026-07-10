@@ -11,6 +11,8 @@ export interface AppSettings {
     "importMode": string;
     "libraryDir": string;
     "remotePathTemplate": string;
+    "opdsEnabled": boolean;
+    "opdsPort": number;
 }
 
 /**
@@ -137,6 +139,17 @@ export interface ImportSummary {
  */
 export interface LibraryStats {
     "books": number;
+}
+
+/**
+ * OPDSStatus is the frontend-facing server state.
+ */
+export interface OPDSStatus {
+    "enabled": boolean;
+    "running": boolean;
+    "port": number;
+    "url": string;
+    "error"?: string;
 }
 
 /**

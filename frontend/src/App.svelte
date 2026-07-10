@@ -3,11 +3,13 @@
   import { Events } from "@wailsio/runtime";
   import {
     LibraryService,
+    OPDSService,
     SettingsService,
     type BookCard,
     type BookDetail,
     type SidebarItem,
     type AppSettings,
+    type OPDSStatus,
     type ImportProgress,
     type ImportSummary,
   } from "./lib/api";
@@ -40,6 +42,7 @@
 
   let detail = $state<BookDetail | null>(null);
   let settings = $state<AppSettings | null>(null);
+  let opdsStatus = $state<OPDSStatus | null>(null);
   let settingsOpen = $state(false);
 
   let importing = $state(false);
@@ -223,7 +226,9 @@
   }
 
   async function openSettings() {
-    settings = await SettingsService.Get();
+    const [nextSettings, nextOPDS] = await Promise.all([SettingsService.Get(), OPDSService.Status()]);
+    settings = nextSettings;
+    opdsStatus = nextOPDS;
     settingsOpen = true;
   }
   async function setMode(m: "copy" | "reference") {
@@ -234,6 +239,14 @@
   }
   async function setRemotePathTemplate(tmpl: string) {
     settings = await SettingsService.SetRemotePathTemplate(tmpl);
+  }
+  async function setOPDSEnabled(enabled: boolean) {
+    opdsStatus = await OPDSService.SetEnabled(enabled);
+    settings = await SettingsService.Get();
+  }
+  async function setOPDSPort(port: number) {
+    opdsStatus = await OPDSService.SetPort(port);
+    settings = await SettingsService.Get();
   }
 
   onMount(() => {
@@ -417,12 +430,15 @@
   <BookDetailView book={detail} onClose={() => (detail = null)} onRemove={removeBook} onSave={saveBook} />
 {/if}
 
-{#if settingsOpen && settings}
+{#if settingsOpen && settings && opdsStatus}
   <SettingsModal
     {settings}
+    {opdsStatus}
     onSetMode={setMode}
     onChooseFolder={chooseFolder}
     onSetRemotePathTemplate={setRemotePathTemplate}
+    onSetOPDSEnabled={setOPDSEnabled}
+    onSetOPDSPort={setOPDSPort}
     onClose={() => (settingsOpen = false)}
   />
 {/if}

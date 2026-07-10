@@ -96,7 +96,7 @@ export function BooksWithoutTag(): $CancellablePromise<$models.BookCard[] | null
 }
 
 /**
- * ChooseAndImport opens a native picker that accepts any mix of EPUB files and
+ * ChooseAndImport opens a native picker that accepts any mix of ebook files and
  * folders (multiple selection), and imports them. Folders are scanned
  * recursively. Emits an "import:progress" event per file. An empty selection
  * (dialog cancelled) is a no-op.

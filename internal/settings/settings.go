@@ -23,6 +23,10 @@ type Settings struct {
 	LibraryDir string `json:"libraryDir"`
 	// RemotePathTemplate controls where files are placed on KOReader sends.
 	RemotePathTemplate string `json:"remotePathTemplate"`
+	// OPDSEnabled controls whether the pull catalog starts with the app.
+	OPDSEnabled bool `json:"opdsEnabled"`
+	// OPDSPort is the TCP port used by the local OPDS catalog.
+	OPDSPort int `json:"opdsPort"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.
@@ -85,6 +89,9 @@ func (s *Store) normalize(in Settings) Settings {
 	}
 	if in.RemotePathTemplate == "" {
 		in.RemotePathTemplate = "{authors}/{series}/{series_index} {title}"
+	}
+	if in.OPDSPort <= 0 || in.OPDSPort > 65535 {
+		in.OPDSPort = 8088
 	}
 	return in
 }

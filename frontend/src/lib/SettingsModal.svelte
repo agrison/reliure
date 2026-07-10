@@ -1,29 +1,46 @@
 <script lang="ts">
-  import type { AppSettings } from "./api";
+  import type { AppSettings, OPDSStatus } from "./api";
 
   let {
     settings,
+    opdsStatus,
     onSetMode,
     onChooseFolder,
     onSetRemotePathTemplate,
+    onSetOPDSEnabled,
+    onSetOPDSPort,
     onClose,
   }: {
     settings: AppSettings;
+    opdsStatus: OPDSStatus;
     onSetMode: (mode: "copy" | "reference") => void;
     onChooseFolder: () => void;
     onSetRemotePathTemplate: (tmpl: string) => void;
+    onSetOPDSEnabled: (enabled: boolean) => void;
+    onSetOPDSPort: (port: number) => void;
     onClose: () => void;
   } = $props();
 
   let remotePathTemplate = $state("");
+  let opdsPort = $state("");
 
   $effect(() => {
     remotePathTemplate = settings.remotePathTemplate;
+    opdsPort = String(opdsStatus.port);
   });
 
   function saveTemplate() {
     if (remotePathTemplate !== settings.remotePathTemplate) {
       onSetRemotePathTemplate(remotePathTemplate);
+    }
+  }
+
+  function savePort() {
+    const port = Number.parseInt(opdsPort, 10);
+    if (Number.isInteger(port) && port > 0 && port <= 65535 && port !== opdsStatus.port) {
+      onSetOPDSPort(port);
+    } else {
+      opdsPort = String(opdsStatus.port);
     }
   }
 </script>
@@ -82,6 +99,38 @@
       if (e.key === "Enter") saveTemplate();
     }}
   />
+
+  <h3 class="mt">Serveur OPDS</h3>
+  <label class="toggle">
+    <input
+      type="checkbox"
+      checked={opdsStatus.enabled}
+      onchange={(e) => onSetOPDSEnabled((e.target as HTMLInputElement).checked)}
+    />
+    <span>Activer le catalogue WiFi</span>
+    <strong>{opdsStatus.running ? "En ligne" : "Arrêté"}</strong>
+  </label>
+  <div class="portrow">
+    <label for="opds-port">Port</label>
+    <input
+      id="opds-port"
+      class="port"
+      inputmode="numeric"
+      bind:value={opdsPort}
+      onblur={savePort}
+      onkeydown={(e) => {
+        if (e.key === "Enter") savePort();
+      }}
+    />
+  </div>
+  {#if opdsStatus.url}
+    <div class="folder">
+      <span class="path ellipsis" title={opdsStatus.url}>{opdsStatus.url}</span>
+    </div>
+  {/if}
+  {#if opdsStatus.error}
+    <p class="error">{opdsStatus.error}</p>
+  {/if}
 </div>
 
 <style>
@@ -209,6 +258,57 @@
     font: inherit;
     font-size: 0.82rem;
     outline: none;
+  }
+  .toggle {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.62rem 0.7rem;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.84rem;
+    color: var(--text);
+  }
+  .toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+  }
+  .toggle strong {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .portrow {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.7rem;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+  .port {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+  }
+  .port:focus {
+    border-color: var(--border-hi);
+    background: var(--surface-hi);
+  }
+  .error {
+    margin: 0.7rem 0 0;
+    color: #ffb0a6;
+    font-size: 0.8rem;
   }
   .template:focus {
     border-color: var(--border-hi);

@@ -4,13 +4,16 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/agrison/reliure/frontend"
 	"github.com/agrison/reliure/internal/core"
+	"github.com/agrison/reliure/internal/opds"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -48,6 +51,18 @@ func main() {
 	coverDir := filepath.Join(configDir, "covers")
 
 	libSvc := &LibraryService{db: db, settings: store, coverDir: coverDir}
+	opdsServer := opds.NewServer(opds.NewHandler(opds.HandlerConfig{
+		Catalog:  opds.CoreCatalog{DB: db},
+		CoverDir: coverDir,
+		Title:    "Reliure",
+	}))
+	opdsSvc := &OPDSService{store: store, server: opdsServer}
+	opdsSvc.startFromSettings()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = opdsSvc.shutdown(ctx)
+	}()
 
 	app := application.New(application.Options{
 		Name:        "Reliure",
@@ -56,6 +71,7 @@ func main() {
 			application.NewService(&App{}),
 			application.NewService(libSvc),
 			application.NewService(&SettingsService{store: store}),
+			application.NewService(opdsSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(coverDir),
