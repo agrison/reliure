@@ -14,6 +14,7 @@ export interface AppSettings {
     "opdsEnabled": boolean;
     "opdsPort": number;
     "writeMetadataToFile": boolean;
+    "theme": string;
 }
 
 /**

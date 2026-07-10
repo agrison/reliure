@@ -13,6 +13,7 @@
     onSetCalibreEnabled,
     onSetWriteMetadataToFile,
     onRegenerateCovers,
+    onSetTheme,
     onClose,
   }: {
     settings: AppSettings;
@@ -26,8 +27,15 @@
     onSetCalibreEnabled: (enabled: boolean) => void;
     onSetWriteMetadataToFile: (enabled: boolean) => void;
     onRegenerateCovers: () => Promise<void> | void;
+    onSetTheme: (theme: "system" | "light" | "dark") => void;
     onClose: () => void;
   } = $props();
+
+  const themes: { value: "system" | "light" | "dark"; label: string }[] = [
+    { value: "system", label: "Auto" },
+    { value: "light", label: "Clair" },
+    { value: "dark", label: "Sombre" },
+  ];
 
   let regenerating = $state(false);
   async function regenerate() {
@@ -72,7 +80,21 @@
     <button class="close" onclick={onClose} aria-label="Fermer">✕</button>
   </header>
 
-  <h3>Mode d'import</h3>
+  <h3>Apparence</h3>
+  <div class="seg" role="radiogroup" aria-label="Thème">
+    {#each themes as t}
+      <button
+        class="seg-btn"
+        class:active={(settings.theme || "system") === t.value}
+        aria-pressed={(settings.theme || "system") === t.value}
+        onclick={() => onSetTheme(t.value)}
+      >
+        {t.label}
+      </button>
+    {/each}
+  </div>
+
+  <h3 class="mt">Mode d'import</h3>
   <div class="seg" role="radiogroup" aria-label="Mode d'import">
     <button
       class="seg-btn"
@@ -272,10 +294,11 @@
   }
   .seg {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     gap: 4px;
     padding: 4px;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--inset);
     border: 1px solid var(--border);
     border-radius: 10px;
   }
@@ -295,7 +318,7 @@
   }
   .seg-btn.active {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--surface-hi);
     box-shadow: inset 0 0 0 1px var(--border);
   }
   .hint {
@@ -310,7 +333,7 @@
     gap: 0.75rem;
     margin-top: 0.7rem;
     padding: 0.55rem 0.7rem;
-    background: rgba(0, 0, 0, 0.22);
+    background: var(--inset);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.8rem;
@@ -352,7 +375,7 @@
     align-items: center;
     gap: 0.7rem;
     padding: 0.62rem 0.7rem;
-    background: rgba(0, 0, 0, 0.22);
+    background: var(--inset);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.84rem;

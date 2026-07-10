@@ -35,6 +35,8 @@ type Settings struct {
 	// directly (e.g. KOReader's file browser) see Reliure's values. Off by
 	// default: it modifies files on disk, including referenced originals.
 	WriteMetadataToFile bool `json:"writeMetadataToFile"`
+	// Theme is the UI appearance: "system" (follow the OS), "light" or "dark".
+	Theme string `json:"theme"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.
@@ -100,6 +102,11 @@ func (s *Store) normalize(in Settings) Settings {
 	}
 	if in.OPDSPort <= 0 || in.OPDSPort > 65535 {
 		in.OPDSPort = 8088
+	}
+	switch in.Theme {
+	case "system", "light", "dark":
+	default:
+		in.Theme = "system"
 	}
 	return in
 }

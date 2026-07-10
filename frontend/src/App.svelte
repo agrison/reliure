@@ -269,6 +269,23 @@
   async function setWriteMetadataToFile(enabled: boolean) {
     settings = await SettingsService.SetWriteMetadataToFile(enabled);
   }
+
+  // applyTheme reflects the choice onto the document: "system" removes the
+  // attribute so the OS preference (via CSS) governs; light/dark pin it. The
+  // value is mirrored to localStorage so the next launch applies it before the
+  // Go settings round-trip (no flash).
+  function applyTheme(theme: string | undefined) {
+    const t = theme === "light" || theme === "dark" ? theme : "system";
+    if (t === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = t;
+    try {
+      localStorage.setItem("theme", t);
+    } catch {}
+  }
+  async function setTheme(theme: "system" | "light" | "dark") {
+    applyTheme(theme);
+    settings = await SettingsService.SetTheme(theme);
+  }
   async function regenerateCovers() {
     try {
       const res = await LibraryService.RegenerateCovers();
@@ -318,6 +335,11 @@
     loadBooks();
     OPDSService.Status().then((s) => (opdsStatus = s)).catch(() => {});
     CalibreService.Status().then((s) => (calibre = s)).catch(() => {});
+    // Sync the theme from persisted settings (source of truth).
+    SettingsService.Get().then((s) => {
+      settings = s;
+      applyTheme(s.theme);
+    }).catch(() => {});
 
     const offCalibre = Events.On("calibre:status", (e: { data: CalibreStatus }) => {
       calibre = e.data;
@@ -533,6 +555,7 @@
     onSetCalibreEnabled={setCalibreEnabled}
     onSetWriteMetadataToFile={setWriteMetadataToFile}
     onRegenerateCovers={regenerateCovers}
+    onSetTheme={setTheme}
     onClose={() => (settingsOpen = false)}
   />
 {/if}

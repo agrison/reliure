@@ -1,4 +1,12 @@
-import { mount } from 'svelte'
-import App from './App.svelte'
+import { mount } from "svelte";
+import App from "./App.svelte";
 
-mount(App, { target: document.getElementById('app')! })
+// Apply the persisted theme before the app paints, to avoid a flash when the
+// user forced a theme different from the OS. The Go settings remain the source
+// of truth and re-sync on mount.
+const saved = localStorage.getItem("theme");
+if (saved === "light" || saved === "dark") {
+  document.documentElement.dataset.theme = saved;
+}
+
+mount(App, { target: document.getElementById("app")! });

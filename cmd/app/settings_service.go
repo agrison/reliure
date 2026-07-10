@@ -21,6 +21,7 @@ type AppSettings struct {
 	OPDSEnabled         bool   `json:"opdsEnabled"`
 	OPDSPort            int    `json:"opdsPort"`
 	WriteMetadataToFile bool   `json:"writeMetadataToFile"`
+	Theme               string `json:"theme"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
@@ -31,6 +32,7 @@ func toAppSettings(s settings.Settings) AppSettings {
 		OPDSEnabled:         s.OPDSEnabled,
 		OPDSPort:            s.OPDSPort,
 		WriteMetadataToFile: s.WriteMetadataToFile,
+		Theme:               s.Theme,
 	}
 }
 
@@ -79,6 +81,14 @@ func (s *SettingsService) SetRemotePathTemplate(tmpl string) (AppSettings, error
 func (s *SettingsService) SetWriteMetadataToFile(enabled bool) (AppSettings, error) {
 	cur := s.store.Get()
 	cur.WriteMetadataToFile = enabled
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
+// SetTheme sets the UI appearance: "system", "light" or "dark".
+func (s *SettingsService) SetTheme(theme string) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.Theme = theme
 	next, err := s.store.Update(cur)
 	return toAppSettings(next), err
 }

@@ -47,6 +47,13 @@ export function SetRemotePathTemplate(tmpl: string): $CancellablePromise<$models
 }
 
 /**
+ * SetTheme sets the UI appearance: "system", "light" or "dark".
+ */
+export function SetTheme(theme: string): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(466396097, theme);
+}
+
+/**
  * SetWriteMetadataToFile toggles writing edited metadata back into ebook files
  * on save.
  */
