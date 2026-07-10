@@ -120,3 +120,39 @@ func TestSessionHandshakeAndSendBook(t *testing.T) {
 		t.Errorf("device metadata title = %q", got.title)
 	}
 }
+
+func TestSessionSendFile(t *testing.T) {
+	clientConn, deviceConn := net.Pipe()
+	var got captured
+	deviceErr := make(chan error, 1)
+	go func() { deviceErr <- fakeDevice(deviceConn, &got) }()
+
+	sess := newSession(clientConn)
+	if err := sess.Handshake("Ma Bibliothèque", "uuid-1"); err != nil {
+		t.Fatalf("Handshake: %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), ".reliure")
+	content := []byte(`{"schema_version":1}`)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lpath, err := sess.SendFile(path, ".reliure", nil, 1, 1)
+	if err != nil {
+		t.Fatalf("SendFile: %v", err)
+	}
+	if lpath != ".reliure" {
+		t.Errorf("lpath = %q", lpath)
+	}
+	sess.Close()
+
+	if err := <-deviceErr; err != nil {
+		t.Fatalf("device error: %v", err)
+	}
+	if got.lpath != ".reliure" {
+		t.Errorf("device lpath = %q", got.lpath)
+	}
+	if string(got.body) != string(content) {
+		t.Errorf("device body = %q", got.body)
+	}
+}

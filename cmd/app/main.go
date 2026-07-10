@@ -14,6 +14,7 @@ import (
 	"github.com/agrison/reliure/frontend"
 	"github.com/agrison/reliure/internal/calibre"
 	"github.com/agrison/reliure/internal/core"
+	"github.com/agrison/reliure/internal/device"
 	"github.com/agrison/reliure/internal/opds"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -68,7 +69,11 @@ func main() {
 	// Calibre wireless (push) server. Connection changes are pushed to the UI
 	// as "calibre:status" events (full status, incl. port/address) so the
 	// sidebar reflects the connected reader.
-	calibreSvc := &CalibreService{db: db, settings: store}
+	calibreSvc := &CalibreService{
+		db:        db,
+		settings:  store,
+		inventory: device.NewStore(filepath.Join(configDir, "devices")),
+	}
 	emitCalibreStatus := func() {
 		application.Get().Event.Emit(calibreStatusEvent, calibreSvc.Status())
 	}

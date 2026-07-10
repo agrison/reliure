@@ -16,6 +16,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * BookStates returns per-book presence information for the connected device.
+ */
+export function BookStates(ids: number[] | null): $CancellablePromise<$models.DeviceBookState[] | null> {
+    return $Call.ByID(1092196108, ids);
+}
+
+/**
  * SendBooks pushes the given books to the connected device, honoring each
  * book's KOReader remote-path template/override (which may include subfolders).
  * Progress is emitted per book as "calibre:progress".

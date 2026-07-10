@@ -25,8 +25,9 @@ internal/
   library/      import pipeline: dedup, file organisation, thumbnails (Session 3, done)
   settings/     persisted user preferences (import mode, library dir, OPDS)
   opds/         OPDS pull catalog over net/http (Session 6, done)
-  calibre/      Calibre "smart device" wireless protocol (Session 7)
-  hooks/        user scripting on lifecycle events (Session 8)
+  calibre/      Calibre "smart device" wireless protocol (Session 7, done)
+  device/       per-reader `.reliure` inventories (Session 8, done)
+  hooks/        user scripting on lifecycle events (Session 10)
 frontend/       Svelte + Vite UI, embedded into the binary
 ```
 
@@ -83,6 +84,22 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `CoreCatalog` adapts `internal/core` repositories, so the same handler can run
   in the Wails app today and in a future headless CLI later.
 
+- **`internal/calibre`** — the Calibre wireless push protocol used by KOReader.
+  Reliure answers UDP discovery, accepts the TCP session, performs the
+  initialization/device-info handshake, keeps the connection alive, and sends
+  files through `SEND_BOOK`. `Session.SendBook` is the book-specific helper;
+  `Session.SendFile` is the lower-level primitive used for auxiliary files such
+  as `.reliure`.
+
+- **`internal/device`** — the per-reader inventory manifest. After successful
+  Calibre sends, Reliure updates a versioned JSON document with local book/file
+  ids, remote path, format, size, SHA-256, sent date and display metadata. The
+  manifest is cached locally under the config directory and sent to the device
+  as `.reliure`. On reconnect, the UI uses the cached inventory for the
+  connected device to mark books as present/absent; direct remote reads of
+  `.reliure` are intentionally left isolated for a later protocol extension if
+  KOReader exposes a reliable file-read path.
+
 - **`cmd/app`** — the desktop shell. Creates the Wails application, registers Go
   *services* whose public methods are callable from JS, and opens the main
   window. It stays deliberately thin: it wires `internal/*` to the UI and holds
@@ -94,17 +111,21 @@ frontend/       Svelte + Vite UI, embedded into the binary
   once) and forward progress as `import:progress` / `import:done` events.
   Catalog: `Books`/`Search`/`BooksBy{Author,Series,Tag}` return `BookCard`s,
   `Authors`/`SeriesList`/`Tags` feed the sidebar with counts, `Book` returns the
-  detail. `SettingsService` reads/writes preferences. `OPDSService` starts,
-  stops and reports the local pull catalog URL. Cover thumbnails are served as
-  files by a custom asset handler (`/covers/…` from the cover cache), never
-  inlined as base64.
+  detail. `QuickEditRows`/`SaveQuickEdits` power the spreadsheet-like bulk
+  metadata editor and deliberately reuse the normal `UpdateBook` path, so file
+  moves, metadata mirroring and validation stay consistent. `SettingsService`
+  reads/writes preferences. `OPDSService` starts, stops and reports the local
+  pull catalog URL. `CalibreService` controls the push server, sends books,
+  updates/sends `.reliure`, and exposes per-book device presence states to the
+  UI. Cover thumbnails are served as files by a custom asset handler
+  (`/covers/…` from the cover cache), never inlined as base64.
 
 - **`frontend`** — Svelte 5 + Vite, TypeScript. The library UI: a sidebar
   (All / Authors / Series / Tags, with counts) drives a main area that toggles
   between a cover grid and a list, with instant debounced full-text search,
-  sorts, a book detail drawer, a settings modal and a drag-and-drop overlay.
-  Components live in `src/lib/`; `src/lib/api.ts` re-exports the generated
-  bindings under a short path. It talks to Go exclusively through the
+  sorts, a book detail drawer, a quick-edit table, a settings modal and a
+  drag-and-drop overlay. Components live in `src/lib/`; `src/lib/api.ts`
+  re-exports the generated bindings under a short path. It talks to Go exclusively through the
   **generated bindings** (`frontend/bindings/…`), which give strongly-typed
   JS/TS wrappers around the bound Go methods and models. No hand-written IPC.
 

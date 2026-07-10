@@ -8,10 +8,13 @@
     SettingsService,
     type BookCard,
     type BookDetail,
+    type QuickEditRow,
+    type QuickEditSaveResult,
     type SidebarItem,
     type AppSettings,
     type OPDSStatus,
     type CalibreStatus,
+    type DeviceBookState,
     type CalibreSendProgress,
     type ImportProgress,
     type ImportSummary,
@@ -20,8 +23,9 @@
   import Sidebar from "./lib/Sidebar.svelte";
   import BookGrid from "./lib/BookGrid.svelte";
   import GroupGrid from "./lib/GroupGrid.svelte";
+  import QuickEditTable from "./lib/QuickEditTable.svelte";
   import BookDetailView from "./lib/BookDetail.svelte";
-  import SettingsModal from "./lib/SettingsModal.svelte";
+  import SettingsView from "./lib/SettingsView.svelte";
 
   let view = $state<View>({ kind: "all" });
   let browseMode = $state<"books" | "author" | "series" | "tag">("books");
@@ -30,6 +34,9 @@
   let viewMode = $state<"grid" | "list">("grid");
   let query = $state("");
   let books = $state<BookCard[]>([]);
+  let quickRows = $state<QuickEditRow[]>([]);
+  let quickLoading = $state(false);
+  let quickSaving = $state(false);
   let loading = $state(true);
   let selectedIds = $state<number[]>([]);
   let batchSeries = $state("");
@@ -47,8 +54,8 @@
   let settings = $state<AppSettings | null>(null);
   let opdsStatus = $state<OPDSStatus | null>(null);
   let calibre = $state<CalibreStatus | null>(null);
+  let deviceStates = $state<Record<number, DeviceBookState>>({});
   let sending = $state(false);
-  let settingsOpen = $state(false);
 
   let importing = $state(false);
   let progress = $state<ImportProgress | null>(null);
@@ -68,8 +75,25 @@
       books = res ?? [];
       const visible = new Set(books.map((b) => b.id));
       selectedIds = selectedIds.filter((id) => visible.has(id));
+      await refreshDeviceStates(books);
     } finally {
       loading = false;
+    }
+  }
+
+  async function refreshDeviceStates(source = books) {
+    if (!calibre?.connected || source.length === 0) {
+      deviceStates = {};
+      return;
+    }
+    try {
+      const states = await CalibreService.BookStates(source.map((b) => b.id));
+      const next: Record<number, DeviceBookState> = {};
+      for (const state of states ?? []) next[state.bookId] = state;
+      deviceStates = next;
+    } catch (e) {
+      console.error("[Reliure] Device inventory failed", e);
+      deviceStates = {};
     }
   }
 
@@ -98,7 +122,44 @@
     parentBrowseMode = null;
     query = "";
     clearSelection();
-    loadBooks();
+    if (v.kind === "quickedit") loadQuickEdit();
+    else if (v.kind === "settings") loadSettings();
+    else loadBooks();
+  }
+
+  async function loadSettings() {
+    const [nextSettings, nextOPDS, nextCalibre] = await Promise.all([
+      SettingsService.Get(),
+      OPDSService.Status(),
+      CalibreService.Status(),
+    ]);
+    settings = nextSettings;
+    opdsStatus = nextOPDS;
+    calibre = nextCalibre;
+  }
+
+  async function loadQuickEdit() {
+    quickLoading = true;
+    try {
+      quickRows = (await LibraryService.QuickEditRows()) ?? [];
+    } finally {
+      quickLoading = false;
+    }
+  }
+
+  async function saveQuickEdit(rows: QuickEditRow[]): Promise<QuickEditSaveResult> {
+    quickSaving = true;
+    try {
+      const res = await LibraryService.SaveQuickEdits(rows);
+      toast =
+        `${res.updated} ligne${res.updated === 1 ? "" : "s"} sauvegardée${res.updated === 1 ? "" : "s"}` +
+        (res.failed ? ` · ${res.failed} échec${res.failed === 1 ? "" : "s"}` : "");
+      setTimeout(() => (toast = ""), 6000);
+      await Promise.all([loadSidebar(), loadBooks()]);
+      return res;
+    } finally {
+      quickSaving = false;
+    }
   }
 
   let searchTimer: ReturnType<typeof setTimeout>;
@@ -252,10 +313,12 @@
   }
 
   async function openSettings() {
-    const [nextSettings, nextOPDS] = await Promise.all([SettingsService.Get(), OPDSService.Status()]);
-    settings = nextSettings;
-    opdsStatus = nextOPDS;
-    settingsOpen = true;
+    view = { kind: "settings" };
+    browseMode = "books";
+    parentBrowseMode = null;
+    query = "";
+    clearSelection();
+    await loadSettings();
   }
   async function setMode(m: "copy" | "reference") {
     settings = await SettingsService.SetImportMode(m);
@@ -319,9 +382,11 @@
       const res = await CalibreService.SendBooks(orderedIds);
       toast =
         `${res.sent} envoyé${res.sent === 1 ? "" : "s"} vers la liseuse` +
-        (res.failed ? ` · ${res.failed} échec${res.failed === 1 ? "" : "s"}` : "");
+        (res.failed ? ` · ${res.failed} échec${res.failed === 1 ? "" : "s"}` : "") +
+        (res.inventoryError ? " · inventaire non mis à jour" : "");
       setTimeout(() => (toast = ""), 6000);
       clearSelection();
+      await refreshDeviceStates();
     } catch (e) {
       toast = `Envoi impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -334,7 +399,10 @@
     loadSidebar();
     loadBooks();
     OPDSService.Status().then((s) => (opdsStatus = s)).catch(() => {});
-    CalibreService.Status().then((s) => (calibre = s)).catch(() => {});
+    CalibreService.Status().then((s) => {
+      calibre = s;
+      refreshDeviceStates();
+    }).catch(() => {});
     // Sync the theme from persisted settings (source of truth).
     SettingsService.Get().then((s) => {
       settings = s;
@@ -343,6 +411,7 @@
 
     const offCalibre = Events.On("calibre:status", (e: { data: CalibreStatus }) => {
       calibre = e.data;
+      refreshDeviceStates();
     });
     const offCalibreProgress = Events.On("calibre:progress", (e: { data: CalibreSendProgress }) => {
       const p = e.data;
@@ -383,7 +452,9 @@
     if (!q) return source;
     return source.filter((item) => item.name.toLowerCase().includes(q));
   });
-  const visibleCount = $derived(browseMode === "books" ? books.length : groupItems.length);
+  const visibleCount = $derived(
+    view.kind === "quickedit" ? quickRows.length : view.kind === "settings" ? 0 : browseMode === "books" ? books.length : groupItems.length,
+  );
 </script>
 
 <svelte:window
@@ -422,32 +493,36 @@
           </button>
         {/if}
         <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? "Auteurs" : browseMode === "series" ? "Séries" : "Tags"}</h1>
-        <span class="n">{visibleCount}</span>
+        {#if view.kind !== "settings"}
+          <span class="n">{visibleCount}</span>
+        {/if}
       </div>
 
-      <div class="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"
-          ><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path
-            d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          /></svg
-        >
-        <input
-          type="search"
-          placeholder="Rechercher…"
-          value={query}
-          oninput={onSearch}
-          aria-label="Rechercher"
-        />
-      </div>
+      {#if view.kind !== "quickedit" && view.kind !== "settings"}
+        <div class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"
+            ><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path
+              d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            /></svg
+          >
+          <input
+            type="search"
+            placeholder="Rechercher…"
+            value={query}
+            oninput={onSearch}
+            aria-label="Rechercher"
+          />
+        </div>
 
-      <div class="sort">
-        <select value={browseMode} onchange={(e) => setBrowseMode((e.target as HTMLSelectElement).value as any)} aria-label="Vue">
-          <option value="books">Livres</option>
-          <option value="author">Auteurs</option>
-          <option value="series">Séries</option>
-          <option value="tag">Tags</option>
-        </select>
-      </div>
+        <div class="sort">
+          <select value={browseMode} onchange={(e) => setBrowseMode((e.target as HTMLSelectElement).value as any)} aria-label="Vue">
+            <option value="books">Livres</option>
+            <option value="author">Auteurs</option>
+            <option value="series">Séries</option>
+            <option value="tag">Tags</option>
+          </select>
+        </div>
+      {/if}
 
       {#if browseMode === "books" && view.kind === "all" && !query.trim()}
         <div class="sort">
@@ -459,7 +534,7 @@
         </div>
       {/if}
 
-      {#if browseMode === "books"}
+      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings"}
         <div class="viewtoggle" role="group" aria-label="Affichage">
           <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
@@ -470,9 +545,11 @@
         </div>
       {/if}
 
-      <button class="import" onclick={doImport} disabled={importing}>
-        {importing ? "Import…" : "Importer"}
-      </button>
+      {#if view.kind !== "quickedit" && view.kind !== "settings"}
+        <button class="import" onclick={doImport} disabled={importing}>
+          {importing ? "Import…" : "Importer"}
+        </button>
+      {/if}
     </header>
 
     {#if importing && progress}
@@ -498,7 +575,32 @@
     {/if}
 
     <div class="content">
-      {#if browseMode !== "books"}
+      {#if view.kind === "settings"}
+        {#if settings && opdsStatus}
+          <SettingsView
+            {settings}
+            {opdsStatus}
+            {calibre}
+            onSetMode={setMode}
+            onChooseFolder={chooseFolder}
+            onSetRemotePathTemplate={setRemotePathTemplate}
+            onSetOPDSEnabled={setOPDSEnabled}
+            onSetOPDSPort={setOPDSPort}
+            onSetCalibreEnabled={setCalibreEnabled}
+            onSetWriteMetadataToFile={setWriteMetadataToFile}
+            onRegenerateCovers={regenerateCovers}
+            onSetTheme={setTheme}
+          />
+        {:else}
+          <p class="state">Chargement…</p>
+        {/if}
+      {:else if view.kind === "quickedit"}
+        {#if quickLoading}
+          <p class="state">Chargement…</p>
+        {:else}
+          <QuickEditTable rows={quickRows} saving={quickSaving} onSave={saveQuickEdit} onReload={loadQuickEdit} />
+        {/if}
+      {:else if browseMode !== "books"}
         {#if groupItems.length === 0}
           <div class="empty">
             <p>{query.trim() ? `Aucun groupe pour « ${query} ».` : "Aucun groupe à afficher."}</p>
@@ -525,7 +627,7 @@
           {/if}
         </div>
       {:else}
-        <BookGrid {books} mode={viewMode} {selectedIds} onOpen={openBook} onToggleSelect={toggleSelect} />
+        <BookGrid {books} mode={viewMode} {selectedIds} {deviceStates} onOpen={openBook} onToggleSelect={toggleSelect} />
       {/if}
     </div>
   </main>
@@ -539,24 +641,6 @@
     onSave={saveBook}
     onSetTitleSort={setTitleSort}
     onSetAuthorSort={setAuthorSort}
-  />
-{/if}
-
-{#if settingsOpen && settings && opdsStatus}
-  <SettingsModal
-    {settings}
-    {opdsStatus}
-    {calibre}
-    onSetMode={setMode}
-    onChooseFolder={chooseFolder}
-    onSetRemotePathTemplate={setRemotePathTemplate}
-    onSetOPDSEnabled={setOPDSEnabled}
-    onSetOPDSPort={setOPDSPort}
-    onSetCalibreEnabled={setCalibreEnabled}
-    onSetWriteMetadataToFile={setWriteMetadataToFile}
-    onRegenerateCovers={regenerateCovers}
-    onSetTheme={setTheme}
-    onClose={() => (settingsOpen = false)}
   />
 {/if}
 

@@ -35,6 +35,21 @@ func bookMetadata(b *core.Book, lpath string, size int64) map[string]any {
 	return md
 }
 
+// fileMetadata builds a minimal metadata dictionary for non-book files such as
+// Reliure's device inventory manifest.
+func fileMetadata(title, lpath string, size int64) map[string]any {
+	return map[string]any{
+		"title":     title,
+		"authors":   []string{"Reliure"},
+		"lpath":     lpath,
+		"uuid":      "reliure-inventory",
+		"size":      size,
+		"tags":      []string{"Reliure"},
+		"languages": []string{},
+		"comments":  "Reliure device inventory",
+	}
+}
+
 func authorsOrUnknown(b *core.Book) []string {
 	names := b.AuthorNames()
 	if len(names) == 0 {

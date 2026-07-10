@@ -101,6 +101,45 @@ type BatchUpdateResult struct {
 	Updated int `json:"updated"`
 }
 
+// QuickEditRow is one editable row in the spreadsheet-like metadata editor.
+// Multi-value fields are comma- or semicolon-separated strings for ergonomic
+// paste/edit workflows.
+type QuickEditRow struct {
+	ID                        int64  `json:"id"`
+	Title                     string `json:"title"`
+	TitleSort                 string `json:"titleSort"`
+	Authors                   string `json:"authors"`
+	Series                    string `json:"series"`
+	SeriesIndex               string `json:"seriesIndex"`
+	Tags                      string `json:"tags"`
+	Language                  string `json:"language"`
+	Published                 string `json:"published"`
+	ISBN                      string `json:"isbn"`
+	RemotePathOverrideEnabled bool   `json:"remotePathOverrideEnabled"`
+	RemotePathOverride        string `json:"remotePathOverride"`
+	UpdatedAt                 string `json:"updatedAt"`
+}
+
+// QuickEditSaveResult summarizes a quick-edit save.
+type QuickEditSaveResult struct {
+	Updated int                  `json:"updated"`
+	Failed  int                  `json:"failed"`
+	Errors  []QuickEditRowError  `json:"errors"`
+	Rows    []QuickEditSavedBook `json:"rows"`
+}
+
+// QuickEditRowError reports a failed row without aborting the whole batch.
+type QuickEditRowError struct {
+	ID    int64  `json:"id"`
+	Error string `json:"error"`
+}
+
+// QuickEditSavedBook carries fresh timestamps for rows saved successfully.
+type QuickEditSavedBook struct {
+	ID        int64  `json:"id"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 // SidebarItem is a named entry (author/series/tag) with a book count.
 type SidebarItem struct {
 	ID    int64  `json:"id"`
@@ -267,6 +306,69 @@ func (s *LibraryService) Book(id int64) (BookDetail, error) {
 		})
 	}
 	return d, nil
+}
+
+// QuickEditRows returns every book as a flat row for the spreadsheet-like
+// editor. It intentionally loads full books so the row contains relations.
+func (s *LibraryService) QuickEditRows() ([]QuickEditRow, error) {
+	books, err := s.db.Books.Browse("title", 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]QuickEditRow, 0, len(books))
+	for _, b := range books {
+		rows = append(rows, quickEditRow(b))
+	}
+	return rows, nil
+}
+
+// SaveQuickEdits applies changed quick-edit rows. Rows are independent: a
+// validation/file-move failure is reported for that row and does not prevent
+// later rows from saving.
+func (s *LibraryService) SaveQuickEdits(rows []QuickEditRow) (QuickEditSaveResult, error) {
+	var res QuickEditSaveResult
+	for _, row := range rows {
+		before, err := s.db.Books.ByID(row.ID)
+		if err != nil {
+			res.Failed++
+			res.Errors = append(res.Errors, QuickEditRowError{ID: row.ID, Error: err.Error()})
+			continue
+		}
+		if row.UpdatedAt != "" && formatTime(before.UpdatedAt) != row.UpdatedAt {
+			res.Failed++
+			res.Errors = append(res.Errors, QuickEditRowError{ID: row.ID, Error: "livre modifié depuis le chargement"})
+			continue
+		}
+		_, err = s.UpdateBook(BookUpdate{
+			ID:                        row.ID,
+			Title:                     row.Title,
+			TitleSort:                 row.TitleSort,
+			Authors:                   splitQuickList(row.Authors),
+			Series:                    row.Series,
+			SeriesIndex:               row.SeriesIndex,
+			Description:               before.Description,
+			Language:                  row.Language,
+			ISBN:                      row.ISBN,
+			Published:                 row.Published,
+			Tags:                      splitQuickList(row.Tags),
+			RemotePathOverrideEnabled: row.RemotePathOverrideEnabled,
+			RemotePathOverride:        row.RemotePathOverride,
+		})
+		if err != nil {
+			res.Failed++
+			res.Errors = append(res.Errors, QuickEditRowError{ID: row.ID, Error: err.Error()})
+			continue
+		}
+		fresh, err := s.db.Books.ByID(row.ID)
+		if err != nil {
+			res.Failed++
+			res.Errors = append(res.Errors, QuickEditRowError{ID: row.ID, Error: err.Error()})
+			continue
+		}
+		res.Updated++
+		res.Rows = append(res.Rows, QuickEditSavedBook{ID: row.ID, UpdatedAt: formatTime(fresh.UpdatedAt)})
+	}
+	return res, nil
 }
 
 // UpdateBook persists editable metadata and moves managed files when the
@@ -460,6 +562,41 @@ func bookFromUpdate(in BookUpdate, before *core.Book) (*core.Book, error) {
 		b.Tags = append(b.Tags, core.Tag{Name: name})
 	}
 	return b, nil
+}
+
+func quickEditRow(b *core.Book) QuickEditRow {
+	tags := make([]string, 0, len(b.Tags))
+	for _, t := range b.Tags {
+		tags = append(tags, t.Name)
+	}
+	return QuickEditRow{
+		ID:                        b.ID,
+		Title:                     b.Title,
+		TitleSort:                 b.TitleSort,
+		Authors:                   strings.Join(b.AuthorNames(), ", "),
+		Series:                    seriesName(b),
+		SeriesIndex:               quickSeriesIndex(b),
+		Tags:                      strings.Join(tags, ", "),
+		Language:                  b.Language,
+		Published:                 b.PublishedAt,
+		ISBN:                      b.ISBN,
+		RemotePathOverrideEnabled: b.RemotePathOverrideEnabled,
+		RemotePathOverride:        b.RemotePathOverride,
+		UpdatedAt:                 formatTime(b.UpdatedAt),
+	}
+}
+
+func quickSeriesIndex(b *core.Book) string {
+	if b.SeriesIndex == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*b.SeriesIndex, 'f', -1, 64)
+}
+
+func splitQuickList(raw string) []string {
+	return cleanStrings(strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n'
+	}))
 }
 
 func cleanStrings(in []string) []string {

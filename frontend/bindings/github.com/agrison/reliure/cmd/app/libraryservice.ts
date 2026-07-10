@@ -116,6 +116,14 @@ export function ImportPaths(paths: string[] | null): $CancellablePromise<$models
 }
 
 /**
+ * QuickEditRows returns every book as a flat row for the spreadsheet-like
+ * editor. It intentionally loads full books so the row contains relations.
+ */
+export function QuickEditRows(): $CancellablePromise<$models.QuickEditRow[] | null> {
+    return $Call.ByID(866761192);
+}
+
+/**
  * RegenerateCovers builds a cached thumbnail for every book that lacks one
  * (e.g. PDFs imported before cover extraction existed). Books whose file yields
  * no image are left without a cover.
@@ -131,6 +139,15 @@ export function RegenerateCovers(): $CancellablePromise<$models.CoverResult> {
  */
 export function RemoveBook(id: number): $CancellablePromise<$models.RemoveBookResult> {
     return $Call.ByID(3088526047, id);
+}
+
+/**
+ * SaveQuickEdits applies changed quick-edit rows. Rows are independent: a
+ * validation/file-move failure is reported for that row and does not prevent
+ * later rows from saving.
+ */
+export function SaveQuickEdits(rows: $models.QuickEditRow[] | null): $CancellablePromise<$models.QuickEditSaveResult> {
+    return $Call.ByID(793741923, rows);
 }
 
 /**

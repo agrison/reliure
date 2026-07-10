@@ -156,6 +156,69 @@ func TestBatchSetSeriesAssignsConsecutiveIndices(t *testing.T) {
 	}
 }
 
+func TestQuickEditRowsAndSave(t *testing.T) {
+	svc, bookID, _, _ := newRemoveBookService(t)
+
+	rows, err := svc.QuickEditRows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].ID != bookID || rows[0].Title != "Title" {
+		t.Fatalf("rows = %+v", rows)
+	}
+	rows[0].Title = "Edited"
+	rows[0].Authors = "Ada Lovelace; Grace Hopper"
+	rows[0].Tags = "math, computing"
+	rows[0].Series = "Pioneers"
+	rows[0].SeriesIndex = "1"
+
+	res, err := svc.SaveQuickEdits(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Updated != 1 || res.Failed != 0 {
+		t.Fatalf("result = %+v", res)
+	}
+	got, err := svc.db.Books.ByID(bookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "Edited" || len(got.Authors) != 2 || got.Authors[1].Author.Name != "Grace Hopper" {
+		t.Fatalf("book after quick edit = %+v", got)
+	}
+	if got.Series == nil || got.Series.Name != "Pioneers" || got.SeriesIndex == nil || *got.SeriesIndex != 1 {
+		t.Fatalf("series after quick edit = %+v idx=%v", got.Series, got.SeriesIndex)
+	}
+	if len(got.Tags) != 2 {
+		t.Fatalf("tags after quick edit = %+v", got.Tags)
+	}
+}
+
+func TestSaveQuickEditsReportsConflictsPerRow(t *testing.T) {
+	svc, bookID, _, _ := newRemoveBookService(t)
+	rows, err := svc.QuickEditRows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows[0].UpdatedAt = "2000-01-01T00:00:00Z"
+	rows[0].Title = "Should Not Save"
+
+	res, err := svc.SaveQuickEdits(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Updated != 0 || res.Failed != 1 || len(res.Errors) != 1 {
+		t.Fatalf("result = %+v", res)
+	}
+	got, err := svc.db.Books.ByID(bookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title == "Should Not Save" {
+		t.Fatal("conflicting row was saved")
+	}
+}
+
 func newRemoveBookService(t *testing.T) (*LibraryService, int64, string, string) {
 	t.Helper()
 	db, err := core.Open(":memory:")

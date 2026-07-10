@@ -1,16 +1,18 @@
 <script lang="ts">
-  import type { BookCard } from "./api";
+  import type { BookCard, DeviceBookState } from "./api";
 
   let {
     books,
     mode,
     selectedIds,
+    deviceStates,
     onOpen,
     onToggleSelect,
   }: {
     books: BookCard[];
     mode: "grid" | "list";
     selectedIds: number[];
+    deviceStates: Record<number, DeviceBookState>;
     onOpen: (id: number) => void;
     onToggleSelect: (id: number) => void;
   } = $props();
@@ -32,6 +34,11 @@
     for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) % 360;
     return h;
   }
+
+  function deviceLabel(state: DeviceBookState | undefined): string {
+    if (!state || state.status === "unknown") return "";
+    return state.status === "present" ? "Sur liseuse" : "Absent";
+  }
 </script>
 
 {#if mode === "grid"}
@@ -52,6 +59,15 @@
             <img src={b.cover} alt="" loading="lazy" />
           {:else}
             <div class="ph" style="--h:{hue(b.title)}">{initials(b.title)}</div>
+          {/if}
+          {#if deviceLabel(deviceStates[b.id])}
+            <span
+              class="device"
+              class:present={deviceStates[b.id]?.status === "present"}
+              title={deviceStates[b.id]?.remotePath || deviceLabel(deviceStates[b.id])}
+            >
+              {deviceLabel(deviceStates[b.id])}
+            </span>
           {/if}
         </div>
         <div class="cap">
@@ -89,6 +105,15 @@
         {#if b.series}
           <div class="series ellipsis">
             {b.series}{b.seriesIndex ? ` #${b.seriesIndex}` : ""}
+          </div>
+        {/if}
+        {#if deviceLabel(deviceStates[b.id])}
+          <div
+            class="device listbadge"
+            class:present={deviceStates[b.id]?.status === "present"}
+            title={deviceStates[b.id]?.remotePath || deviceLabel(deviceStates[b.id])}
+          >
+            {deviceLabel(deviceStates[b.id])}
           </div>
         {/if}
         <div class="formats">
@@ -171,6 +196,28 @@
     object-fit: cover;
     display: block;
   }
+  .device {
+    position: absolute;
+    right: 0.45rem;
+    bottom: 0.45rem;
+    max-width: calc(100% - 0.9rem);
+    padding: 0.22rem 0.42rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.62);
+    color: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    font-size: 0.66rem;
+    font-weight: 650;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+  }
+  .device.present {
+    background: color-mix(in srgb, var(--accent) 82%, #0b1410);
+    color: var(--accent-ink);
+    border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  }
   .ph {
     width: 100%;
     height: 100%;
@@ -225,7 +272,7 @@
     cursor: pointer;
     text-align: left;
     display: grid;
-    grid-template-columns: 40px 1fr auto auto;
+    grid-template-columns: 40px minmax(0, 1fr) auto auto auto;
     align-items: center;
     gap: 1rem;
     padding: 0.55rem 0.6rem;
@@ -261,6 +308,11 @@
     color: var(--muted);
     font-size: 0.8rem;
     max-width: 200px;
+  }
+  .listbadge {
+    position: static;
+    justify-self: end;
+    max-width: 110px;
   }
   .formats {
     display: flex;

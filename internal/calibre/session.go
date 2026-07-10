@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/agrison/reliure/internal/core"
@@ -91,6 +92,16 @@ func (s *Session) Handshake(libraryName, libraryUUID string) error {
 // subfolders). thisBook/totalBooks drive the device's progress display. It
 // returns the effective lpath (the device may rewrite it).
 func (s *Session) SendBook(b *core.Book, filePath, lpath string, thisBook, totalBooks int) (string, error) {
+	st, err := os.Stat(filePath)
+	if err != nil {
+		return "", err
+	}
+	return s.SendFile(filePath, lpath, bookMetadata(b, lpath, st.Size()), thisBook, totalBooks)
+}
+
+// SendFile transfers one arbitrary file to the device at lpath. Metadata must
+// already match the lpath/length pair expected by the device.
+func (s *Session) SendFile(filePath, lpath string, metadata map[string]any, thisBook, totalBooks int) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -104,11 +115,16 @@ func (s *Session) SendBook(b *core.Book, filePath, lpath string, thisBook, total
 		return "", err
 	}
 	length := st.Size()
+	if metadata == nil {
+		metadata = fileMetadata(filepath.Base(lpath), lpath, length)
+	}
+	metadata["lpath"] = lpath
+	metadata["size"] = length
 
 	payload := map[string]any{
 		"lpath":                  lpath,
 		"length":                 length,
-		"metadata":               bookMetadata(b, lpath, length),
+		"metadata":               metadata,
 		"thisBook":               thisBook,
 		"totalBooks":             totalBooks,
 		"willStreamBooks":        true,

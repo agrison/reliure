@@ -139,6 +139,21 @@ export interface CoverResult {
 }
 
 /**
+ * DeviceBookState tells the UI whether a local book is known to be on the
+ * currently connected device according to the last `.reliure` inventory.
+ */
+export interface DeviceBookState {
+    "bookId": number;
+
+    /**
+     * "unknown" | "absent" | "present"
+     */
+    "status": string;
+    "remotePath"?: string;
+    "sentAt"?: string;
+}
+
+/**
  * FileInfo describes one file backing a book.
  */
 export interface FileInfo {
@@ -202,6 +217,53 @@ export interface PingResult {
 }
 
 /**
+ * QuickEditRow is one editable row in the spreadsheet-like metadata editor.
+ * Multi-value fields are comma- or semicolon-separated strings for ergonomic
+ * paste/edit workflows.
+ */
+export interface QuickEditRow {
+    "id": number;
+    "title": string;
+    "titleSort": string;
+    "authors": string;
+    "series": string;
+    "seriesIndex": string;
+    "tags": string;
+    "language": string;
+    "published": string;
+    "isbn": string;
+    "remotePathOverrideEnabled": boolean;
+    "remotePathOverride": string;
+    "updatedAt": string;
+}
+
+/**
+ * QuickEditRowError reports a failed row without aborting the whole batch.
+ */
+export interface QuickEditRowError {
+    "id": number;
+    "error": string;
+}
+
+/**
+ * QuickEditSaveResult summarizes a quick-edit save.
+ */
+export interface QuickEditSaveResult {
+    "updated": number;
+    "failed": number;
+    "errors": QuickEditRowError[] | null;
+    "rows": QuickEditSavedBook[] | null;
+}
+
+/**
+ * QuickEditSavedBook carries fresh timestamps for rows saved successfully.
+ */
+export interface QuickEditSavedBook {
+    "id": number;
+    "updatedAt": string;
+}
+
+/**
  * RemoveBookResult describes how a removed book was handled.
  */
 export interface RemoveBookResult {
@@ -216,6 +278,8 @@ export interface RemoveBookResult {
 export interface SendResult {
     "sent": number;
     "failed": number;
+    "inventorySent": boolean;
+    "inventoryError"?: string;
 }
 
 /**

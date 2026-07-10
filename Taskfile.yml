@@ -35,7 +35,7 @@ tasks:
   dev:
     summary: Runs the application in development mode
     cmds:
-      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+      - '{{if eq OS "darwin"}}MACOSX_DEPLOYMENT_TARGET=15.0 CGO_CFLAGS="-mmacosx-version-min=15.0" CGO_LDFLAGS="-mmacosx-version-min=15.0" {{end}}wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}'
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)

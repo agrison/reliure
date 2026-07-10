@@ -1,6 +1,8 @@
 // View is the current library selection driving the main list.
 export type View =
   | { kind: "all" }
+  | { kind: "quickedit" }
+  | { kind: "settings" }
   | { kind: "author"; id: number; name: string }
   | { kind: "series"; id: number; name: string }
   | { kind: "tag"; id: number; name: string };
@@ -9,6 +11,10 @@ export function viewTitle(v: View): string {
   switch (v.kind) {
     case "all":
       return "Tous les livres";
+    case "quickedit":
+      return "Édition rapide";
+    case "settings":
+      return "Réglages";
     case "author":
       return v.name;
     case "series":

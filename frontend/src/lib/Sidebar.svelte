@@ -45,11 +45,18 @@
 </script>
 
 <aside class="sidebar">
-  <div class="brand">Reliure</div>
+  <div class="brand">
+    <img src="/reliure-logo.png" alt="" aria-hidden="true" />
+    <span>Reliure</span>
+  </div>
 
   <button class="root" class:active={active.kind === "all"} onclick={() => onSelect({ kind: "all" })}>
     <span>Tous les livres</span>
     <span class="count">{total}</span>
+  </button>
+
+  <button class="root tool" class:active={active.kind === "quickedit"} onclick={() => onSelect({ kind: "quickedit" })}>
+    <span>Édition rapide</span>
   </button>
 
   <nav class="groups">
@@ -119,7 +126,7 @@
     </button>
   {/if}
 
-  <button class="settings" onclick={onOpenSettings}>
+  <button class="settings" class:active={active.kind === "settings"} onclick={onOpenSettings}>
     <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"
       ><path
         d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
@@ -143,10 +150,19 @@
     overflow: hidden;
   }
   .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
     font-weight: 700;
     font-size: 1.05rem;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     padding: 0.5rem 0.6rem 0.9rem;
+  }
+  .brand img {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    object-fit: contain;
   }
 
   button {
@@ -299,6 +315,11 @@
   .settings:hover {
     background: var(--surface-hi);
     border-color: var(--border-hi);
+    color: var(--text);
+  }
+  .settings.active {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
     color: var(--text);
   }
   .settings svg {

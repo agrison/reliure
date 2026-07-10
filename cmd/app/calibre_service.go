@@ -4,11 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/agrison/reliure/internal/calibre"
 	"github.com/agrison/reliure/internal/core"
+	"github.com/agrison/reliure/internal/device"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -27,9 +31,10 @@ func init() {
 // CalibreService controls the Calibre wireless (push) server that lets KOReader
 // connect over WiFi, and sends books to the connected device.
 type CalibreService struct {
-	db       *core.DB
-	settings *settings.Store
-	server   *calibre.Server
+	db        *core.DB
+	settings  *settings.Store
+	server    *calibre.Server
+	inventory *device.Store
 }
 
 // CalibreStatus is the frontend-facing push-server state.
@@ -54,8 +59,19 @@ type CalibreSendProgress struct {
 
 // SendResult summarizes a send-to-device run.
 type SendResult struct {
-	Sent   int `json:"sent"`
-	Failed int `json:"failed"`
+	Sent           int    `json:"sent"`
+	Failed         int    `json:"failed"`
+	InventorySent  bool   `json:"inventorySent"`
+	InventoryError string `json:"inventoryError,omitempty"`
+}
+
+// DeviceBookState tells the UI whether a local book is known to be on the
+// currently connected device according to the last `.reliure` inventory.
+type DeviceBookState struct {
+	BookID     int64  `json:"bookId"`
+	Status     string `json:"status"` // "unknown" | "absent" | "present"
+	RemotePath string `json:"remotePath,omitempty"`
+	SentAt     string `json:"sentAt,omitempty"`
 }
 
 // startFromSettings starts the push server at boot if the preference says so.
@@ -87,6 +103,35 @@ func (s *CalibreService) Status() CalibreStatus {
 	return st
 }
 
+// BookStates returns per-book presence information for the connected device.
+func (s *CalibreService) BookStates(ids []int64) ([]DeviceBookState, error) {
+	if s.inventory == nil {
+		return unknownStates(ids), nil
+	}
+	deviceName, connected := s.server.Device()
+	if !connected {
+		return unknownStates(ids), nil
+	}
+	inv, err := s.inventory.Load(deviceName)
+	if err != nil {
+		return nil, err
+	}
+	byBook := inv.ByBookID()
+	out := make([]DeviceBookState, 0, len(ids))
+	for _, id := range ids {
+		state := DeviceBookState{BookID: id, Status: "absent"}
+		if e, ok := byBook[id]; ok {
+			state.Status = "present"
+			state.RemotePath = e.RemotePath
+			if !e.SentAt.IsZero() {
+				state.SentAt = e.SentAt.UTC().Format(time.RFC3339)
+			}
+		}
+		out = append(out, state)
+	}
+	return out, nil
+}
+
 // SetEnabled starts or stops the push server and persists the preference.
 func (s *CalibreService) SetEnabled(enabled bool) (CalibreStatus, error) {
 	cfg := s.settings.Get()
@@ -112,11 +157,12 @@ func (s *CalibreService) SendBooks(ids []int64) (SendResult, error) {
 	if sess == nil {
 		return SendResult{}, errors.New("aucune liseuse connectée")
 	}
-	device, _ := s.server.Device()
+	deviceName, _ := s.server.Device()
 	tmpl := s.settings.Get().RemotePathTemplate
 	total := len(ids)
 	var res SendResult
-	slog.Info("calibre: send starting", "books", total, "device", device)
+	var sentEntries []device.Entry
+	slog.Info("calibre: send starting", "books", total, "device", deviceName)
 
 	for i, id := range ids {
 		prog := CalibreSendProgress{Total: total, Done: i + 1}
@@ -155,12 +201,82 @@ func (s *CalibreService) SendBooks(ids []int64) (SendResult, error) {
 		} else {
 			res.Sent++
 			prog.Ok = true
+			sentEntries = append(sentEntries, inventoryEntry(b, *file, finalLpath))
 			slog.Info("calibre: sent", "title", b.Title, "from", file.Path, "to", finalLpath, "bytes", file.Size)
 		}
 		application.Get().Event.Emit(calibreProgressEvent, prog)
 	}
-	slog.Info("calibre: send finished", "sent", res.Sent, "failed", res.Failed, "device", device)
+	if len(sentEntries) > 0 {
+		if err := s.updateAndSendInventory(sess, deviceName, sentEntries); err != nil {
+			res.InventoryError = err.Error()
+			slog.Warn("calibre: inventory update failed", "device", deviceName, "err", err)
+		} else {
+			res.InventorySent = true
+		}
+	}
+	slog.Info("calibre: send finished", "sent", res.Sent, "failed", res.Failed, "device", deviceName)
 	return res, nil
+}
+
+func (s *CalibreService) updateAndSendInventory(sess *calibre.Session, deviceName string, entries []device.Entry) error {
+	if s.inventory == nil {
+		return nil
+	}
+	inv, err := s.inventory.Load(deviceName)
+	if err != nil {
+		return err
+	}
+	inv.Upsert(entries...)
+	if err := s.inventory.Save(inv); err != nil {
+		return err
+	}
+	data, err := device.MarshalDeviceFile(inv)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp("", "reliure-inventory-*.json")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	_, err = sess.SendFile(
+		tmpPath,
+		device.InventoryFilename,
+		nil,
+		1,
+		1,
+	)
+	return err
+}
+
+func inventoryEntry(b *core.Book, f core.File, remotePath string) device.Entry {
+	return device.Entry{
+		BookID:     b.ID,
+		FileID:     f.ID,
+		RemotePath: remotePath,
+		Format:     strings.ToLower(f.Format),
+		Size:       f.Size,
+		SHA256:     f.SHA256,
+		SentAt:     time.Now().UTC(),
+		Title:      b.Title,
+		Authors:    b.AuthorNames(),
+	}
+}
+
+func unknownStates(ids []int64) []DeviceBookState {
+	out := make([]DeviceBookState, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, DeviceBookState{BookID: id, Status: "unknown"})
+	}
+	return out
 }
 
 // sendableFile picks the file to send: EPUB is preferred, otherwise the first.
@@ -184,5 +300,5 @@ func remoteLpath(tmpl string, b *core.Book, format string) string {
 	if !strings.EqualFold(path.Ext(p), ext) {
 		p += ext
 	}
-	return p
+	return filepath.ToSlash(p)
 }
