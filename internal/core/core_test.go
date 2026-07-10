@@ -50,8 +50,13 @@ func TestMigrateIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 1 {
-		t.Fatalf("version schéma = %d, attendu 1", v)
+	migs, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := migs[len(migs)-1].version
+	if v != want {
+		t.Fatalf("version schéma = %d, attendu %d", v, want)
 	}
 }
 

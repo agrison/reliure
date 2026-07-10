@@ -4,12 +4,18 @@
   let {
     books,
     mode,
+    selectedIds,
     onOpen,
+    onToggleSelect,
   }: {
     books: BookCard[];
     mode: "grid" | "list";
+    selectedIds: number[];
     onOpen: (id: number) => void;
+    onToggleSelect: (id: number) => void;
   } = $props();
+
+  const selected = $derived(new Set(selectedIds));
 
   function initials(title: string): string {
     return title
@@ -31,7 +37,16 @@
 {#if mode === "grid"}
   <div class="grid">
     {#each books as b (b.id)}
-      <button class="cell" onclick={() => onOpen(b.id)} title={b.title}>
+      <div class="cell" class:selected={selected.has(b.id)}>
+        <button
+          class="select"
+          class:active={selected.has(b.id)}
+          onclick={() => onToggleSelect(b.id)}
+          aria-label={selected.has(b.id) ? "Désélectionner" : "Sélectionner"}
+        >
+          {selected.has(b.id) ? "✓" : ""}
+        </button>
+        <button class="open" onclick={() => onOpen(b.id)} title={b.title}>
         <div class="cover">
           {#if b.cover}
             <img src={b.cover} alt="" loading="lazy" />
@@ -43,13 +58,23 @@
           <div class="t ellipsis">{b.title}</div>
           <div class="a ellipsis">{b.authors || "—"}</div>
         </div>
-      </button>
+        </button>
+      </div>
     {/each}
   </div>
 {:else}
   <div class="list">
     {#each books as b (b.id)}
-      <button class="row" onclick={() => onOpen(b.id)}>
+      <div class="row" class:selected={selected.has(b.id)}>
+        <button
+          class="select"
+          class:active={selected.has(b.id)}
+          onclick={() => onToggleSelect(b.id)}
+          aria-label={selected.has(b.id) ? "Désélectionner" : "Sélectionner"}
+        >
+          {selected.has(b.id) ? "✓" : ""}
+        </button>
+        <button class="rowopen" onclick={() => onOpen(b.id)}>
         <div class="thumb">
           {#if b.cover}
             <img src={b.cover} alt="" loading="lazy" />
@@ -69,7 +94,8 @@
         <div class="formats">
           {#each b.formats as f}<span class="tag">{f}</span>{/each}
         </div>
-      </button>
+        </button>
+      </div>
     {/each}
   </div>
 {/if}
@@ -82,16 +108,27 @@
     padding: 1.5rem;
   }
   .cell {
-    font: inherit;
-    color: inherit;
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    padding: 0;
+    position: relative;
+    min-width: 0;
+    padding: 3px;
+    border-radius: 10px;
+  }
+  .cell.selected {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .open {
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
   .cover {
     position: relative;
@@ -102,9 +139,31 @@
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
     transition: transform 0.16s ease, box-shadow 0.16s ease;
   }
-  .cell:hover .cover {
+  .open:hover .cover {
     transform: translateY(-4px);
     box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  }
+  .select {
+    position: absolute;
+    z-index: 2;
+    top: 0.45rem;
+    left: 0.45rem;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border-hi);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.74rem;
+    cursor: pointer;
+  }
+  .select.active {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
   }
   .cover img {
     width: 100%;
@@ -145,11 +204,24 @@
     padding: 0.5rem 1rem 1.5rem;
   }
   .row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .row.selected {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .row .select {
+    position: static;
+    margin-left: 0.2rem;
+  }
+  .rowopen {
     font: inherit;
     color: inherit;
     background: none;
     border: none;
-    border-bottom: 1px solid var(--border);
     cursor: pointer;
     text-align: left;
     display: grid;
@@ -157,8 +229,9 @@
     align-items: center;
     gap: 1rem;
     padding: 0.55rem 0.6rem;
+    min-width: 0;
   }
-  .row:hover {
+  .rowopen:hover {
     background: var(--surface);
   }
   .thumb {

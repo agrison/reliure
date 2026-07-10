@@ -108,3 +108,69 @@ func TestCounts(t *testing.T) {
 		t.Errorf("tag counts = %v", tName)
 	}
 }
+
+func TestMissingRelationCountsAndLists(t *testing.T) {
+	db := newTestDB(t)
+	books := []*Book{
+		{
+			Title:   "Complete",
+			Authors: []Contribution{{Author: Author{Name: "Author"}}},
+			Series:  &Series{Name: "Series"},
+			Tags:    []Tag{{Name: "Tag"}},
+		},
+		{Title: "Empty"},
+		{
+			Title:  "No Author",
+			Series: &Series{Name: "Series"},
+			Tags:   []Tag{{Name: "Tag"}},
+		},
+		{
+			Title:   "No Series",
+			Authors: []Contribution{{Author: Author{Name: "Author"}}},
+			Tags:    []Tag{{Name: "Tag"}},
+		},
+		{
+			Title:   "No Tag",
+			Authors: []Contribution{{Author: Author{Name: "Author"}}},
+			Series:  &Series{Name: "Series"},
+		},
+	}
+	for _, b := range books {
+		if err := db.Books.Create(b); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	withoutAuthors, err := db.Books.ListWithoutAuthors()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(withoutAuthors); len(got) != 2 || got[0] != "Empty" || got[1] != "No Author" {
+		t.Fatalf("without authors = %v", got)
+	}
+	if n, err := db.Authors.CountMissing(); err != nil || n != 2 {
+		t.Fatalf("missing authors = %d, %v", n, err)
+	}
+
+	withoutSeries, err := db.Books.ListWithoutSeries()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(withoutSeries); len(got) != 2 || got[0] != "Empty" || got[1] != "No Series" {
+		t.Fatalf("without series = %v", got)
+	}
+	if n, err := db.Series.CountMissing(); err != nil || n != 2 {
+		t.Fatalf("missing series = %d, %v", n, err)
+	}
+
+	withoutTags, err := db.Books.ListWithoutTags()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(withoutTags); len(got) != 2 || got[0] != "Empty" || got[1] != "No Tag" {
+		t.Fatalf("without tags = %v", got)
+	}
+	if n, err := db.Tags.CountMissing(); err != nil || n != 2 {
+		t.Fatalf("missing tags = %d, %v", n, err)
+	}
+}

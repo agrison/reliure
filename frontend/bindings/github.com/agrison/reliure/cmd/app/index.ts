@@ -12,13 +12,17 @@ export {
 
 export type {
     AppSettings,
+    BatchSeriesUpdate,
+    BatchUpdateResult,
     BookCard,
     BookDetail,
+    BookUpdate,
     Contributor,
     FileInfo,
     ImportProgress,
     ImportSummary,
     LibraryStats,
     PingResult,
+    RemoveBookResult,
     SidebarItem
 } from "./models.js";

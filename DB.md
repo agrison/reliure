@@ -11,7 +11,7 @@ defined by embedded, versioned SQL migrations; the canonical source of truth is
   (`os.UserConfigDir()`, i.e. `~/Library/Application Support/reliure/` on macOS,
   `%AppData%\reliure\` on Windows, `~/.config/reliure/` on Linux). See
   `core.DefaultDBPath`.
-- **Library directory** (where EPUB files are copied and organised) is a
+- **Library directory** (where ebook files are copied and organised) is a
   **separate, user-configurable** concept — it is *not* the config dir. Session 3
   wires it up.
 - Tests use an in-memory database via `core.Open(":memory:")`.
@@ -62,9 +62,9 @@ author ──┐                          ┌── tag
   Carries the MARC `role` ("aut", "trl", "edt"…) and a `position` for display
   order.
 - **`book_tag`** — plain many-to-many join.
-- **`file`** — one row per physical file (a book can have several formats).
-  `path` is UNIQUE (a file lives in exactly one place), and `sha256` is indexed
-  to support deduplication in Session 3.
+- **`file`** — one row per physical file (a book can have several formats,
+  currently EPUB and PDF). `path` is UNIQUE (a file lives in exactly one place),
+  and `sha256` is indexed to support deduplication in Session 3.
 - **`schema_version`** — bookkeeping for the migration runner (see below).
 
 Deleting a book cascades to `book_author`, `book_tag` and `file` (via

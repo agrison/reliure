@@ -10,6 +10,24 @@ export interface AppSettings {
      */
     "importMode": string;
     "libraryDir": string;
+    "remotePathTemplate": string;
+}
+
+/**
+ * BatchSeriesUpdate assigns one series to several books. When SeriesIndexStart
+ * is set, books receive consecutive indices in the order provided by IDs.
+ */
+export interface BatchSeriesUpdate {
+    "ids": number[] | null;
+    "series": string;
+    "seriesIndexStart": string;
+}
+
+/**
+ * BatchUpdateResult summarizes a metadata batch operation.
+ */
+export interface BatchUpdateResult {
+    "updated": number;
 }
 
 /**
@@ -32,6 +50,7 @@ export interface BookCard {
 export interface BookDetail {
     "id": number;
     "title": string;
+    "titleSort": string;
     "authors": Contributor[] | null;
     "series": string;
     "seriesIndex": number;
@@ -42,6 +61,32 @@ export interface BookDetail {
     "tags": string[] | null;
     "cover": string;
     "files": FileInfo[] | null;
+    "addedAt": string;
+    "updatedAt": string;
+    "remotePathOverrideEnabled": boolean;
+    "remotePathOverride": string;
+    "remotePath": string;
+}
+
+/**
+ * BookUpdate is the editable metadata payload sent by the frontend. Files are
+ * intentionally excluded; they are moved only as a consequence of title/author
+ * changes for managed-library books.
+ */
+export interface BookUpdate {
+    "id": number;
+    "title": string;
+    "titleSort": string;
+    "authors": string[] | null;
+    "series": string;
+    "seriesIndex": string;
+    "description": string;
+    "language": string;
+    "isbn": string;
+    "published": string;
+    "tags": string[] | null;
+    "remotePathOverrideEnabled": boolean;
+    "remotePathOverride": string;
 }
 
 /**
@@ -49,6 +94,7 @@ export interface BookDetail {
  */
 export interface Contributor {
     "name": string;
+    "sortName": string;
     "role": string;
 }
 
@@ -59,6 +105,8 @@ export interface FileInfo {
     "format": string;
     "size": number;
     "path": string;
+    "sha256": string;
+    "addedAt": string;
 }
 
 /**
@@ -100,6 +148,15 @@ export interface PingResult {
     "message": string;
     "goVersion": string;
     "platform": string;
+}
+
+/**
+ * RemoveBookResult describes how a removed book was handled.
+ */
+export interface RemoveBookResult {
+    "removedFromIndex": number;
+    "trashedFiles": number;
+    "keptFiles": number;
 }
 
 /**

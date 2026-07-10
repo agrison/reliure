@@ -16,8 +16,9 @@ import (
 
 	"github.com/agrison/reliure/internal/core"
 
-	// Registers the EPUB handler into formats.Default.
+	// Registers format handlers into formats.Default.
 	_ "github.com/agrison/reliure/internal/formats/epub"
+	_ "github.com/agrison/reliure/internal/formats/pdf"
 )
 
 func newImporter(t *testing.T, merge bool) (*Importer, *core.DB, string) {
@@ -109,6 +110,19 @@ func makeEPUB(t *testing.T, dir, name, title, author, series, filler string, cov
 	return path
 }
 
+func makePDF(t *testing.T, dir, name, title, author string) string {
+	t.Helper()
+	if dir == "" {
+		dir = t.TempDir()
+	}
+	path := filepath.Join(dir, name)
+	body := fmt.Sprintf("%%PDF-1.7\n1 0 obj\n<< /Title (%s) /Author (%s) >>\nendobj\n%%%%EOF\n", title, author)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestImportCreatesBookCopiesFileAndCover(t *testing.T) {
 	imp, db, _ := newImporter(t, true)
 	src := makeEPUB(t, "", "book.epub", "Dune", "Frank Herbert", "Dune", "x", pngCover(t))
@@ -153,6 +167,57 @@ func TestImportCreatesBookCopiesFileAndCover(t *testing.T) {
 		t.Error("cover path not set")
 	} else if _, err := os.Stat(filepath.Join(imp.cfg.CoverDir, b.CoverPath)); err != nil {
 		t.Errorf("thumbnail missing: %v", err)
+	}
+}
+
+func TestImportPDFCreatesEditableBook(t *testing.T) {
+	imp, db, _ := newImporter(t, true)
+	src := makePDF(t, "", "paper.pdf", "Designing Data-Intensive Applications", "Martin Kleppmann")
+
+	sum, err := imp.Import(context.Background(), []string{src}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Imported != 1 || sum.Total != 1 {
+		t.Fatalf("summary = %+v", sum)
+	}
+
+	books, err := db.Books.List(0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(books) != 1 {
+		t.Fatalf("book count = %d", len(books))
+	}
+	b := books[0]
+	if b.Title != "Designing Data-Intensive Applications" {
+		t.Fatalf("title = %q", b.Title)
+	}
+	if len(b.Authors) != 1 || b.Authors[0].Author.Name != "Martin Kleppmann" {
+		t.Fatalf("authors = %+v", b.Authors)
+	}
+	if len(b.Files) != 1 || b.Files[0].Format != "pdf" {
+		t.Fatalf("files = %+v", b.Files)
+	}
+	want := filepath.Join(imp.cfg.LibraryDir, "Martin Kleppmann", "Designing Data-Intensive Applications", "Designing Data-Intensive Applications.pdf")
+	if b.Files[0].Path != want {
+		t.Fatalf("copied path = %q, want %q", b.Files[0].Path, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("copied PDF missing: %v", err)
+	}
+
+	b.Title = "DDIA"
+	b.Tags = []core.Tag{{Name: "architecture"}}
+	if err := db.Books.Update(b); err != nil {
+		t.Fatalf("update PDF metadata book: %v", err)
+	}
+	updated, err := db.Books.ByID(b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Title != "DDIA" || len(updated.Tags) != 1 || updated.Tags[0].Name != "architecture" {
+		t.Fatalf("updated book = %+v", updated)
 	}
 }
 
@@ -358,8 +423,8 @@ func TestScanRecursive(t *testing.T) {
 	imp, _, root := newImporter(t, true)
 	src := filepath.Join(root, "src")
 	makeEPUB(t, mustMkdir(t, src), "a.epub", "A", "X", "", "f", nil)
-	makeEPUB(t, mustMkdir(t, filepath.Join(src, "sub")), "b.epub", "B", "Y", "", "f", nil)
-	// Noise: a non-epub and a hidden directory with an epub in it.
+	makePDF(t, mustMkdir(t, filepath.Join(src, "sub")), "b.pdf", "B", "Y")
+	// Noise: a non-ebook and a hidden directory with an epub in it.
 	os.WriteFile(filepath.Join(src, "readme.txt"), []byte("x"), 0o644)
 	makeEPUB(t, mustMkdir(t, filepath.Join(src, ".hidden")), "c.epub", "C", "Z", "", "f", nil)
 

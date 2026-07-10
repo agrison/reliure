@@ -21,6 +21,8 @@ type Settings struct {
 	ImportMode library.Mode `json:"importMode"`
 	// LibraryDir is the managed library root, used only in copy mode.
 	LibraryDir string `json:"libraryDir"`
+	// RemotePathTemplate controls where files are placed on KOReader sends.
+	RemotePathTemplate string `json:"remotePathTemplate"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.
@@ -80,6 +82,9 @@ func (s *Store) normalize(in Settings) Settings {
 	}
 	if in.LibraryDir == "" {
 		in.LibraryDir = s.defaultLibrary
+	}
+	if in.RemotePathTemplate == "" {
+		in.RemotePathTemplate = "{authors}/{series}/{series_index} {title}"
 	}
 	return in
 }

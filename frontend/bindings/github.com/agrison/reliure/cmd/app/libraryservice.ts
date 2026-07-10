@@ -17,10 +17,26 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * AuthorGroups returns author tiles for the grouped library view, including a
+ * synthetic fallback tile for books without authors.
+ */
+export function AuthorGroups(): $CancellablePromise<$models.SidebarItem[] | null> {
+    return $Call.ByID(2765419737);
+}
+
+/**
  * Authors returns the sidebar's author list with counts.
  */
 export function Authors(): $CancellablePromise<$models.SidebarItem[] | null> {
     return $Call.ByID(2813498622);
+}
+
+/**
+ * BatchSetSeries assigns or clears a series for selected books. It does not
+ * move files: the managed path currently depends on title/primary author only.
+ */
+export function BatchSetSeries($in: $models.BatchSeriesUpdate): $CancellablePromise<$models.BatchUpdateResult> {
+    return $Call.ByID(1314132227, $in);
 }
 
 /**
@@ -59,6 +75,27 @@ export function BooksByTag(id: number): $CancellablePromise<$models.BookCard[] |
 }
 
 /**
+ * BooksWithoutAuthor returns books that have no author link.
+ */
+export function BooksWithoutAuthor(): $CancellablePromise<$models.BookCard[] | null> {
+    return $Call.ByID(1277655111);
+}
+
+/**
+ * BooksWithoutSeries returns books that are not attached to a series.
+ */
+export function BooksWithoutSeries(): $CancellablePromise<$models.BookCard[] | null> {
+    return $Call.ByID(3866900761);
+}
+
+/**
+ * BooksWithoutTag returns books that carry no tag.
+ */
+export function BooksWithoutTag(): $CancellablePromise<$models.BookCard[] | null> {
+    return $Call.ByID(1073537316);
+}
+
+/**
  * ChooseAndImport opens a native picker that accepts any mix of EPUB files and
  * folders (multiple selection), and imports them. Folders are scanned
  * recursively. Emits an "import:progress" event per file. An empty selection
@@ -79,10 +116,27 @@ export function ImportPaths(paths: string[] | null): $CancellablePromise<$models
 }
 
 /**
+ * RemoveBook removes a book from the library index. Files stored inside the
+ * managed LibraryDir are moved to the system trash first; files outside that
+ * tree are left untouched and only disappear from Reliure's index.
+ */
+export function RemoveBook(id: number): $CancellablePromise<$models.RemoveBookResult> {
+    return $Call.ByID(3088526047, id);
+}
+
+/**
  * Search returns books matching a full-text query, ranked by relevance.
  */
 export function Search(query: string): $CancellablePromise<$models.BookCard[] | null> {
     return $Call.ByID(2206755262, query);
+}
+
+/**
+ * SeriesGroups returns series tiles for the grouped library view, including a
+ * synthetic fallback tile for books without a series.
+ */
+export function SeriesGroups(): $CancellablePromise<$models.SidebarItem[] | null> {
+    return $Call.ByID(1818650967);
 }
 
 /**
@@ -100,8 +154,25 @@ export function Stats(): $CancellablePromise<$models.LibraryStats> {
 }
 
 /**
+ * TagGroups returns tag tiles for the grouped library view, including a
+ * synthetic fallback tile for books without tags.
+ */
+export function TagGroups(): $CancellablePromise<$models.SidebarItem[] | null> {
+    return $Call.ByID(1631548982);
+}
+
+/**
  * Tags returns the sidebar's tag list with counts.
  */
 export function Tags(): $CancellablePromise<$models.SidebarItem[] | null> {
     return $Call.ByID(4025079207);
+}
+
+/**
+ * UpdateBook persists editable metadata and moves managed files when the
+ * primary author or title changes. The database remains the source of truth:
+ * if a file move fails, moved files and metadata are rolled back best-effort.
+ */
+export function UpdateBook($in: $models.BookUpdate): $CancellablePromise<$models.BookDetail> {
+    return $Call.ByID(279100834, $in);
 }

@@ -14,20 +14,29 @@
   import { type View, viewTitle } from "./lib/types";
   import Sidebar from "./lib/Sidebar.svelte";
   import BookGrid from "./lib/BookGrid.svelte";
+  import GroupGrid from "./lib/GroupGrid.svelte";
   import BookDetailView from "./lib/BookDetail.svelte";
   import SettingsModal from "./lib/SettingsModal.svelte";
 
   let view = $state<View>({ kind: "all" });
+  let browseMode = $state<"books" | "author" | "series" | "tag">("books");
+  let parentBrowseMode = $state<"author" | "series" | "tag" | null>(null);
   let sort = $state<"title" | "author" | "added">("title");
   let viewMode = $state<"grid" | "list">("grid");
   let query = $state("");
   let books = $state<BookCard[]>([]);
   let loading = $state(true);
+  let selectedIds = $state<number[]>([]);
+  let batchSeries = $state("");
+  let batchSeriesStart = $state("");
 
   let total = $state(0);
   let authors = $state<SidebarItem[]>([]);
   let series = $state<SidebarItem[]>([]);
   let tags = $state<SidebarItem[]>([]);
+  let authorGroups = $state<SidebarItem[]>([]);
+  let seriesGroups = $state<SidebarItem[]>([]);
+  let tagGroups = $state<SidebarItem[]>([]);
 
   let detail = $state<BookDetail | null>(null);
   let settings = $state<AppSettings | null>(null);
@@ -44,32 +53,43 @@
       const q = query.trim();
       let res: BookCard[] | null;
       if (q) res = await LibraryService.Search(q);
-      else if (view.kind === "author") res = await LibraryService.BooksByAuthor(view.id);
-      else if (view.kind === "series") res = await LibraryService.BooksBySeries(view.id);
-      else if (view.kind === "tag") res = await LibraryService.BooksByTag(view.id);
+      else if (view.kind === "author") res = view.id === 0 ? await LibraryService.BooksWithoutAuthor() : await LibraryService.BooksByAuthor(view.id);
+      else if (view.kind === "series") res = view.id === 0 ? await LibraryService.BooksWithoutSeries() : await LibraryService.BooksBySeries(view.id);
+      else if (view.kind === "tag") res = view.id === 0 ? await LibraryService.BooksWithoutTag() : await LibraryService.BooksByTag(view.id);
       else res = await LibraryService.Books(sort);
       books = res ?? [];
+      const visible = new Set(books.map((b) => b.id));
+      selectedIds = selectedIds.filter((id) => visible.has(id));
     } finally {
       loading = false;
     }
   }
 
   async function loadSidebar() {
-    const [t, a, s, g] = await Promise.all([
+    const [t, a, s, g, ag, sg, tg] = await Promise.all([
       LibraryService.Stats(),
       LibraryService.Authors(),
       LibraryService.SeriesList(),
       LibraryService.Tags(),
+      LibraryService.AuthorGroups(),
+      LibraryService.SeriesGroups(),
+      LibraryService.TagGroups(),
     ]);
     total = t.books;
     authors = a ?? [];
     series = s ?? [];
     tags = g ?? [];
+    authorGroups = ag ?? [];
+    seriesGroups = sg ?? [];
+    tagGroups = tg ?? [];
   }
 
   function selectView(v: View) {
     view = v;
+    browseMode = "books";
+    parentBrowseMode = null;
     query = "";
+    clearSelection();
     loadBooks();
   }
 
@@ -77,7 +97,36 @@
   function onSearch(e: Event) {
     query = (e.target as HTMLInputElement).value;
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(loadBooks, 200);
+    if (browseMode === "books") {
+      searchTimer = setTimeout(loadBooks, 200);
+    }
+  }
+
+  function setBrowseMode(mode: "books" | "author" | "series" | "tag") {
+    browseMode = mode;
+    parentBrowseMode = null;
+    clearSelection();
+    if (mode !== "books") {
+      view = { kind: "all" };
+      query = "";
+    }
+    if (mode === "books") {
+      loadBooks();
+    }
+  }
+
+  function openGroup(kind: "author" | "series" | "tag", item: SidebarItem) {
+    view = { kind, id: item.id, name: item.name };
+    browseMode = "books";
+    parentBrowseMode = kind;
+    query = "";
+    clearSelection();
+    loadBooks();
+  }
+
+  function backToGroups() {
+    if (!parentBrowseMode) return;
+    setBrowseMode(parentBrowseMode);
   }
 
   function setSort(s: "title" | "author" | "added") {
@@ -90,6 +139,81 @@
       detail = await LibraryService.Book(id);
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  async function removeBook(book: BookDetail) {
+    console.info("[Reliure] RemoveBook requested", { id: book.id, title: book.title });
+    try {
+      const res = await LibraryService.RemoveBook(book.id);
+      console.info("[Reliure] RemoveBook completed", res);
+      detail = null;
+      toast =
+        res.trashedFiles > 0
+          ? `Livre retiré · ${res.trashedFiles} fichier${res.trashedFiles === 1 ? "" : "s"} déplacé${res.trashedFiles === 1 ? "" : "s"} dans la corbeille`
+          : "Livre retiré de l’index";
+      setTimeout(() => (toast = ""), 6000);
+      await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      console.error("[Reliure] RemoveBook failed", e);
+      toast = `Suppression impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
+
+  async function saveBook(update: Parameters<typeof LibraryService.UpdateBook>[0]) {
+    try {
+      detail = await LibraryService.UpdateBook(update);
+      toast = "Métadonnées enregistrées";
+      setTimeout(() => (toast = ""), 4000);
+      await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      console.error("[Reliure] UpdateBook failed", e);
+      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+      throw e;
+    }
+  }
+
+  function toggleSelect(id: number) {
+    selectedIds = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+  }
+
+  function clearSelection() {
+    selectedIds = [];
+    batchSeries = "";
+    batchSeriesStart = "";
+  }
+
+  async function applyBatchSeries() {
+    if (selectedIds.length === 0) return;
+    try {
+      const orderedIds = books.map((b) => b.id).filter((id) => selectedIds.includes(id));
+      const res = await LibraryService.BatchSetSeries({
+        ids: orderedIds,
+        series: batchSeries,
+        seriesIndexStart: batchSeriesStart,
+      });
+      toast = `${res.updated} livre${res.updated === 1 ? "" : "s"} mis à jour`;
+      setTimeout(() => (toast = ""), 4000);
+      clearSelection();
+      await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      console.error("[Reliure] BatchSetSeries failed", e);
+      toast = `Édition par lot impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
+
+  function errorMessage(e: unknown): string {
+    if (e instanceof Error) return e.message;
+    if (typeof e === "string") return e;
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return "erreur inconnue";
     }
   }
 
@@ -107,6 +231,9 @@
   }
   async function chooseFolder() {
     settings = await SettingsService.ChooseLibraryFolder();
+  }
+  async function setRemotePathTemplate(tmpl: string) {
+    settings = await SettingsService.SetRemotePathTemplate(tmpl);
   }
 
   onMount(() => {
@@ -139,6 +266,13 @@
   const pct = $derived(
     progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0,
   );
+  const groupItems = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    const source = browseMode === "author" ? authorGroups : browseMode === "series" ? seriesGroups : browseMode === "tag" ? tagGroups : [];
+    if (!q) return source;
+    return source.filter((item) => item.name.toLowerCase().includes(q));
+  });
+  const visibleCount = $derived(browseMode === "books" ? books.length : groupItems.length);
 </script>
 
 <svelte:window
@@ -152,7 +286,7 @@
   ondrop={() => (dragOver = false)}
 />
 
-<div class="app">
+<div class="app" data-file-drop-target>
   <Sidebar
     {total}
     {authors}
@@ -166,8 +300,16 @@
   <main class="main">
     <header class="toolbar">
       <div class="title">
-        <h1>{viewTitle(view)}</h1>
-        <span class="n">{books.length}</span>
+        {#if parentBrowseMode}
+          <button class="back" onclick={backToGroups} aria-label="Retour aux groupes">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Retour
+          </button>
+        {/if}
+        <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? "Auteurs" : browseMode === "series" ? "Séries" : "Tags"}</h1>
+        <span class="n">{visibleCount}</span>
       </div>
 
       <div class="search">
@@ -185,7 +327,16 @@
         />
       </div>
 
-      {#if view.kind === "all" && !query.trim()}
+      <div class="sort">
+        <select value={browseMode} onchange={(e) => setBrowseMode((e.target as HTMLSelectElement).value as any)} aria-label="Vue">
+          <option value="books">Livres</option>
+          <option value="author">Auteurs</option>
+          <option value="series">Séries</option>
+          <option value="tag">Tags</option>
+        </select>
+      </div>
+
+      {#if browseMode === "books" && view.kind === "all" && !query.trim()}
         <div class="sort">
           <select value={sort} onchange={(e) => setSort((e.target as HTMLSelectElement).value as any)}>
             <option value="title">Titre</option>
@@ -195,14 +346,16 @@
         </div>
       {/if}
 
-      <div class="viewtoggle" role="group" aria-label="Affichage">
-        <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
-        </button>
-        <button class:active={viewMode === "list"} onclick={() => (viewMode = "list")} aria-label="Liste">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-      </div>
+      {#if browseMode === "books"}
+        <div class="viewtoggle" role="group" aria-label="Affichage">
+          <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
+          </button>
+          <button class:active={viewMode === "list"} onclick={() => (viewMode = "list")} aria-label="Liste">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      {/if}
 
       <button class="import" onclick={doImport} disabled={importing}>
         {importing ? "Import…" : "Importer"}
@@ -216,8 +369,30 @@
       </div>
     {/if}
 
+    {#if selectedIds.length}
+      <div class="batchbar">
+        <span class="sel">{selectedIds.length} sélectionné{selectedIds.length === 1 ? "" : "s"}</span>
+        <input bind:value={batchSeries} placeholder="Série" aria-label="Série" />
+        <input class="small" bind:value={batchSeriesStart} placeholder="Tome départ" aria-label="Tome de départ" />
+        <button onclick={applyBatchSeries}>Assigner</button>
+        <button class="ghost" onclick={clearSelection}>Annuler</button>
+      </div>
+    {/if}
+
     <div class="content">
-      {#if loading && books.length === 0}
+      {#if browseMode !== "books"}
+        {#if groupItems.length === 0}
+          <div class="empty">
+            <p>{query.trim() ? `Aucun groupe pour « ${query} ».` : "Aucun groupe à afficher."}</p>
+          </div>
+        {:else if browseMode === "author"}
+          <GroupGrid items={groupItems} kind="author" onOpen={(item) => openGroup("author", item)} />
+        {:else if browseMode === "series"}
+          <GroupGrid items={groupItems} kind="series" onOpen={(item) => openGroup("series", item)} />
+        {:else if browseMode === "tag"}
+          <GroupGrid items={groupItems} kind="tag" onOpen={(item) => openGroup("tag", item)} />
+        {/if}
+      {:else if loading && books.length === 0}
         <p class="state">Chargement…</p>
       {:else if books.length === 0}
         <div class="empty">
@@ -232,14 +407,14 @@
           {/if}
         </div>
       {:else}
-        <BookGrid {books} mode={viewMode} onOpen={openBook} />
+        <BookGrid {books} mode={viewMode} {selectedIds} onOpen={openBook} onToggleSelect={toggleSelect} />
       {/if}
     </div>
   </main>
 </div>
 
 {#if detail}
-  <BookDetailView book={detail} onClose={() => (detail = null)} />
+  <BookDetailView book={detail} onClose={() => (detail = null)} onRemove={removeBook} onSave={saveBook} />
 {/if}
 
 {#if settingsOpen && settings}
@@ -247,6 +422,7 @@
     {settings}
     onSetMode={setMode}
     onChooseFolder={chooseFolder}
+    onSetRemotePathTemplate={setRemotePathTemplate}
     onClose={() => (settingsOpen = false)}
   />
 {/if}
@@ -256,7 +432,7 @@
 {/if}
 
 {#if dragOver}
-  <div class="dropzone">
+  <div class="dropzone file-drop-target-active">
     <div class="dropcard">Déposez vos livres pour les importer</div>
   </div>
 {/if}
@@ -285,9 +461,32 @@
   }
   .title {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 0.6rem;
     min-width: 0;
+  }
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .back:hover {
+    color: var(--text);
+    background: var(--surface-hi);
+    border-color: var(--border-hi);
+  }
+  .back svg {
+    width: 15px;
+    height: 15px;
   }
   .title h1 {
     margin: 0;
@@ -396,6 +595,56 @@
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     overflow: hidden;
+  }
+
+  .batchbar {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .batchbar .sel {
+    color: var(--muted);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .batchbar input {
+    min-width: 0;
+    width: min(260px, 24vw);
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.84rem;
+    outline: none;
+  }
+  .batchbar input.small {
+    width: 120px;
+  }
+  .batchbar input:focus {
+    border-color: var(--border-hi);
+    background: var(--surface-hi);
+  }
+  .batchbar button {
+    padding: 0.45rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .batchbar button.ghost {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-weight: 500;
   }
   .progress .fill {
     position: absolute;

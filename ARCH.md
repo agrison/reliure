@@ -1,6 +1,6 @@
 # Architecture
 
-Reliure is a cross-platform desktop EPUB library manager. The backend is 100 %
+Reliure is a cross-platform desktop ebook library manager. The backend is 100 %
 Go; the UI is a lightweight web frontend rendered in the system webview via
 [Wails v3](https://v3.wails.io). See `AGENTS.md` for the session-by-session
 plan and product scope.
@@ -21,6 +21,7 @@ internal/
   core/         models, SQLite, migrations, repositories, full-text search
   formats/      FormatHandler interface + registry (extensibility seam)
     epub/       EPUB parser + cover/thumbnail extraction (Session 2, done)
+    pdf/        PDF Info metadata parser
   library/      import pipeline: dedup, file organisation, thumbnails (Session 3, done)
   settings/     persisted user preferences (import mode, library dir)
   opds/         OPDS server over net/http (Session 6)
@@ -41,13 +42,15 @@ frontend/       Svelte + Vite UI, embedded into the binary
   contract every format implements (`Format`, `CanHandle`, `Metadata`,
   `Cover`); a `Registry` dispatches a file to the first handler that accepts it.
   Handlers produce a neutral `BookMetadata` that the `library` layer maps onto
-  `core` models, so parsing stays independent of storage. Adding PDF later is
-  one new package that registers itself — nothing else changes. The first
-  concrete handler, **`formats/epub`**, is implemented: it parses container.xml
-  → OPF → Dublin Core plus Calibre (`calibre:series`…) and EPUB3 (`refines`,
-  `belongs-to-collection`) metadata, resolves covers through a fallback chain,
-  and generates JPEG thumbnails. It is exhaustively tolerant — malformed input
-  never panics and degrades to a filename title. It self-registers into
+  `core` models, so parsing stays independent of storage. Adding a format is one
+  new package that registers itself — the import pipeline and database stay
+  unchanged. **`formats/epub`** parses container.xml → OPF → Dublin Core plus
+  Calibre (`calibre:series`…) and EPUB3 (`refines`, `belongs-to-collection`)
+  metadata, resolves covers through a fallback chain, and generates JPEG
+  thumbnails. **`formats/pdf`** parses the standard PDF Info dictionary
+  (`Title`, `Author`, `Subject`, `Keywords`, `CreationDate`) and intentionally
+  does not rasterize covers yet. Handlers are tolerant: malformed or sparse
+  inputs never panic and degrade to a filename title. They self-register into
   `formats.Default` via `init` (blank-import idiom).
 
 - **`internal/library`** — the import pipeline. Detects a file's format via the
@@ -76,7 +79,7 @@ frontend/       Svelte + Vite UI, embedded into the binary
   window. It stays deliberately thin: it wires `internal/*` to the UI and holds
   no business logic. `App` exposes a `Ping()` health check; `LibraryService`
   wraps the importer and the catalog. Import: `ChooseAndImport()` opens a native
-  picker (multiple EPUB files and/or folders); `ImportPaths()` handles a mix of
+  picker (multiple EPUB/PDF files and/or folders); `ImportPaths()` handles a mix of
   files and directories and is also the target of window drag-and-drop — both
   build an importer from the *current* settings (so a mode change takes effect at
   once) and forward progress as `import:progress` / `import:done` events.

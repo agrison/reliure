@@ -39,10 +39,12 @@ func (r *BookRepo) Create(b *Book) error {
 	res, err := tx.Exec(
 		`INSERT INTO book
 		   (title, title_sort, description, language, isbn, published_at,
-		    series_id, series_index, added_at, updated_at, cover_path)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		    series_id, series_index, added_at, updated_at, cover_path,
+		    remote_path_override_enabled, remote_path_override)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		b.Title, b.TitleSort, b.Description, b.Language, b.ISBN, b.PublishedAt,
-		seriesID, floatPtr(b.SeriesIndex), ts.Format(rfc3339), ts.Format(rfc3339), b.CoverPath)
+		seriesID, floatPtr(b.SeriesIndex), ts.Format(rfc3339), ts.Format(rfc3339), b.CoverPath,
+		boolInt(b.RemotePathOverrideEnabled), b.RemotePathOverride)
 	if err != nil {
 		return err
 	}
@@ -90,10 +92,12 @@ func (r *BookRepo) Update(b *Book) error {
 	res, err := tx.Exec(
 		`UPDATE book SET
 		   title=?, title_sort=?, description=?, language=?, isbn=?, published_at=?,
-		   series_id=?, series_index=?, updated_at=?, cover_path=?
+		   series_id=?, series_index=?, updated_at=?, cover_path=?,
+		   remote_path_override_enabled=?, remote_path_override=?
 		 WHERE id=?`,
 		b.Title, b.TitleSort, b.Description, b.Language, b.ISBN, b.PublishedAt,
-		seriesID, floatPtr(b.SeriesIndex), ts.Format(rfc3339), b.CoverPath, b.ID)
+		seriesID, floatPtr(b.SeriesIndex), ts.Format(rfc3339), b.CoverPath,
+		boolInt(b.RemotePathOverrideEnabled), b.RemotePathOverride, b.ID)
 	if err != nil {
 		return err
 	}
@@ -155,6 +159,18 @@ func (r *BookRepo) AddFile(bookID int64, f File) (File, error) {
 	}
 	f.ID, err = res.LastInsertId()
 	return f, err
+}
+
+// UpdateFilePath updates the stored path for one file.
+func (r *BookRepo) UpdateFilePath(fileID int64, path string) error {
+	res, err := r.db.Exec(`UPDATE file SET path = ? WHERE id = ?`, path, fileID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // FindByFileSHA returns the id of the book owning a file with the given
@@ -281,6 +297,17 @@ func (r *BookRepo) ListByTag(tagID int64) ([]*Book, error) {
 	return books, r.hydrate(books)
 }
 
+// ListWithoutTags returns books that carry no tag.
+func (r *BookRepo) ListWithoutTags() ([]*Book, error) {
+	q := `SELECT ` + bookCols + ` FROM book b
+	      WHERE NOT EXISTS (SELECT 1 FROM book_tag bt WHERE bt.book_id = b.id) ` + orderClause("title")
+	books, err := r.scanBooks(q)
+	if err != nil {
+		return nil, err
+	}
+	return books, r.hydrate(books)
+}
+
 // orderClause maps a sort key to a safe ORDER BY clause (never interpolates
 // user input — only fixed strings).
 func orderClause(sort string) string {
@@ -311,6 +338,17 @@ func (r *BookRepo) ListByAuthor(authorID int64) ([]*Book, error) {
 	return books, r.hydrate(books)
 }
 
+// ListWithoutAuthors returns books that have no author/contributor link.
+func (r *BookRepo) ListWithoutAuthors() ([]*Book, error) {
+	q := `SELECT ` + bookCols + ` FROM book b
+	      WHERE NOT EXISTS (SELECT 1 FROM book_author ba WHERE ba.book_id = b.id) ` + orderClause("title")
+	books, err := r.scanBooks(q)
+	if err != nil {
+		return nil, err
+	}
+	return books, r.hydrate(books)
+}
+
 // ListBySeries returns a series' books, ordered by index then title.
 func (r *BookRepo) ListBySeries(seriesID int64) ([]*Book, error) {
 	q := `SELECT ` + bookCols + ` FROM book b
@@ -324,10 +362,22 @@ func (r *BookRepo) ListBySeries(seriesID int64) ([]*Book, error) {
 	return books, r.hydrate(books)
 }
 
+// ListWithoutSeries returns books that are not attached to a series.
+func (r *BookRepo) ListWithoutSeries() ([]*Book, error) {
+	q := `SELECT ` + bookCols + ` FROM book b
+	      WHERE b.series_id IS NULL ` + orderClause("title")
+	books, err := r.scanBooks(q)
+	if err != nil {
+		return nil, err
+	}
+	return books, r.hydrate(books)
+}
+
 // --- internals ---
 
 const bookCols = `b.id, b.title, b.title_sort, b.description, b.language, b.isbn,
-	b.published_at, b.series_id, b.series_index, b.added_at, b.updated_at, b.cover_path`
+	b.published_at, b.series_id, b.series_index, b.added_at, b.updated_at, b.cover_path,
+	b.remote_path_override_enabled, b.remote_path_override`
 
 func (r *BookRepo) scanBooks(query string, args ...any) ([]*Book, error) {
 	rows, err := r.db.Query(query, args...)
@@ -342,11 +392,14 @@ func (r *BookRepo) scanBooks(query string, args ...any) ([]*Book, error) {
 			seriesID           sql.NullInt64
 			seriesIdx          sql.NullFloat64
 			addedAt, updatedAt string
+			overrideEnabled    int
 		)
 		if err := rows.Scan(&b.ID, &b.Title, &b.TitleSort, &b.Description, &b.Language,
-			&b.ISBN, &b.PublishedAt, &seriesID, &seriesIdx, &addedAt, &updatedAt, &b.CoverPath); err != nil {
+			&b.ISBN, &b.PublishedAt, &seriesID, &seriesIdx, &addedAt, &updatedAt, &b.CoverPath,
+			&overrideEnabled, &b.RemotePathOverride); err != nil {
 			return nil, err
 		}
+		b.RemotePathOverrideEnabled = overrideEnabled != 0
 		b.AddedAt, _ = time.Parse(rfc3339, addedAt)
 		b.UpdatedAt, _ = time.Parse(rfc3339, updatedAt)
 		if seriesIdx.Valid {
@@ -550,6 +603,13 @@ func floatPtr(p *float64) any {
 		return nil
 	}
 	return *p
+}
+
+func boolInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func limitClause(limit, offset int) string {

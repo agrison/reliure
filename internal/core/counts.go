@@ -40,6 +40,16 @@ func (r *AuthorRepo) Counts() ([]NamedCount, error) {
 	return scanCounts(rows)
 }
 
+// CountMissing returns the number of books without any author link.
+func (r *AuthorRepo) CountMissing() (int, error) {
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM book b
+		WHERE NOT EXISTS (SELECT 1 FROM book_author ba WHERE ba.book_id = b.id)`).Scan(&n)
+	return n, err
+}
+
 // Counts returns every series with their book count, ordered by sort name.
 func (r *SeriesRepo) Counts() ([]NamedCount, error) {
 	rows, err := r.db.Query(`
@@ -53,6 +63,13 @@ func (r *SeriesRepo) Counts() ([]NamedCount, error) {
 	return scanCounts(rows)
 }
 
+// CountMissing returns the number of books not attached to a series.
+func (r *SeriesRepo) CountMissing() (int, error) {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM book WHERE series_id IS NULL`).Scan(&n)
+	return n, err
+}
+
 // Counts returns every tag with their book count, ordered by name.
 func (r *TagRepo) Counts() ([]NamedCount, error) {
 	rows, err := r.db.Query(`
@@ -64,4 +81,14 @@ func (r *TagRepo) Counts() ([]NamedCount, error) {
 		return nil, err
 	}
 	return scanCounts(rows)
+}
+
+// CountMissing returns the number of books without any tag.
+func (r *TagRepo) CountMissing() (int, error) {
+	var n int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM book b
+		WHERE NOT EXISTS (SELECT 1 FROM book_tag bt WHERE bt.book_id = b.id)`).Scan(&n)
+	return n, err
 }

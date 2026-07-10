@@ -96,10 +96,10 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 0.75rem;
+    padding: 2.35rem 0.75rem 0.75rem;
     background: var(--panel);
     border-right: 1px solid var(--border);
-    overflow-y: auto;
+    overflow: hidden;
   }
   .brand {
     font-weight: 700;
@@ -149,6 +149,8 @@
   .groups {
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.15rem;
   }
   .group {
     margin-top: 0.35rem;
@@ -200,16 +202,25 @@
   }
 
   .settings {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    width: 100%;
     padding: 0.55rem 0.6rem;
-    margin-top: 0.5rem;
+    margin-top: 0.65rem;
+    border: 1px solid var(--border);
     border-radius: 8px;
+    background: var(--surface);
     color: var(--muted);
+    text-align: left;
   }
   .settings:hover {
-    background: var(--surface);
+    background: var(--surface-hi);
+    border-color: var(--border-hi);
     color: var(--text);
+  }
+  .settings svg {
+    flex: none;
   }
 </style>

@@ -5,13 +5,27 @@
     settings,
     onSetMode,
     onChooseFolder,
+    onSetRemotePathTemplate,
     onClose,
   }: {
     settings: AppSettings;
     onSetMode: (mode: "copy" | "reference") => void;
     onChooseFolder: () => void;
+    onSetRemotePathTemplate: (tmpl: string) => void;
     onClose: () => void;
   } = $props();
+
+  let remotePathTemplate = $state("");
+
+  $effect(() => {
+    remotePathTemplate = settings.remotePathTemplate;
+  });
+
+  function saveTemplate() {
+    if (remotePathTemplate !== settings.remotePathTemplate) {
+      onSetRemotePathTemplate(remotePathTemplate);
+    }
+  }
 </script>
 
 <div class="scrim" onclick={onClose} role="presentation"></div>
@@ -54,6 +68,20 @@
       référencer, sans copie.
     </p>
   {/if}
+
+  <h3 class="mt">Chemin KOReader</h3>
+  <p class="hint">
+    Modèle utilisé lors des envois futurs. Variables disponibles : {`{authors}`}, {`{series}`},
+    {`{series_index}`}, {`{title}`}, {`{tags}`}, {`{language}`}.
+  </p>
+  <input
+    class="template"
+    bind:value={remotePathTemplate}
+    onblur={saveTemplate}
+    onkeydown={(e) => {
+      if (e.key === "Enter") saveTemplate();
+    }}
+  />
 </div>
 
 <style>
@@ -102,6 +130,9 @@
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--faint);
+  }
+  .mt {
+    margin-top: 1.35rem;
   }
   .seg {
     display: grid;
@@ -166,6 +197,22 @@
   }
   .link:hover {
     text-decoration: underline;
+  }
+  .template {
+    width: 100%;
+    margin-top: 0.7rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.82rem;
+    outline: none;
+  }
+  .template:focus {
+    border-color: var(--border-hi);
+    background: var(--surface-hi);
   }
   .ellipsis {
     overflow: hidden;

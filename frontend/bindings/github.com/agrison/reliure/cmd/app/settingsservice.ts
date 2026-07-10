@@ -38,3 +38,10 @@ export function Get(): $CancellablePromise<$models.AppSettings> {
 export function SetImportMode(mode: string): $CancellablePromise<$models.AppSettings> {
     return $Call.ByID(4033158262, mode);
 }
+
+/**
+ * SetRemotePathTemplate stores the template used for future KOReader sends.
+ */
+export function SetRemotePathTemplate(tmpl: string): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(3717326007, tmpl);
+}

@@ -15,12 +15,17 @@ type SettingsService struct {
 
 // AppSettings is the frontend-facing settings shape (flat, JSON-friendly).
 type AppSettings struct {
-	ImportMode string `json:"importMode"` // "copy" | "reference"
-	LibraryDir string `json:"libraryDir"`
+	ImportMode         string `json:"importMode"` // "copy" | "reference"
+	LibraryDir         string `json:"libraryDir"`
+	RemotePathTemplate string `json:"remotePathTemplate"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
-	return AppSettings{ImportMode: string(s.ImportMode), LibraryDir: s.LibraryDir}
+	return AppSettings{
+		ImportMode:         string(s.ImportMode),
+		LibraryDir:         s.LibraryDir,
+		RemotePathTemplate: s.RemotePathTemplate,
+	}
 }
 
 // Get returns the current settings.
@@ -51,6 +56,14 @@ func (s *SettingsService) ChooseLibraryFolder() (AppSettings, error) {
 	}
 	cur := s.store.Get()
 	cur.LibraryDir = dir
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
+// SetRemotePathTemplate stores the template used for future KOReader sends.
+func (s *SettingsService) SetRemotePathTemplate(tmpl string) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.RemotePathTemplate = tmpl
 	next, err := s.store.Update(cur)
 	return toAppSettings(next), err
 }

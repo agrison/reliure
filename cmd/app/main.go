@@ -15,8 +15,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	// Register the EPUB format handler into formats.Default.
+	// Register format handlers into formats.Default.
 	_ "github.com/agrison/reliure/internal/formats/epub"
+	_ "github.com/agrison/reliure/internal/formats/pdf"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 
 	app := application.New(application.Options{
 		Name:        "Reliure",
-		Description: "Bibliothèque EPUB multiplateforme",
+		Description: "Bibliothèque ebook multiplateforme",
 		Services: []application.Service{
 			application.NewService(&App{}),
 			application.NewService(libSvc),

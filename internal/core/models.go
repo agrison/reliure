@@ -58,8 +58,12 @@ type Book struct {
 	PublishedAt string // free-form text (ISO 8601 when known), not always parseable
 	SeriesIndex *float64
 	CoverPath   string
-	AddedAt     time.Time
-	UpdatedAt   time.Time
+	// RemotePathOverride is used for KOReader sends only when
+	// RemotePathOverrideEnabled is true.
+	RemotePathOverrideEnabled bool
+	RemotePathOverride        string
+	AddedAt                   time.Time
+	UpdatedAt                 time.Time
 
 	Series  *Series
 	Authors []Contribution
