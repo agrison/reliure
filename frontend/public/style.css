@@ -1,0 +1,65 @@
+/* Global tokens and base layout for the library UI. */
+
+:root {
+  --bg-0: #0e0f13;
+  --bg-1: #16171d;
+  --panel: #14151a;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-hi: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-hi: rgba(255, 255, 255, 0.16);
+  --text: #f3f5fa;
+  --muted: #98a1b4;
+  --faint: #6b7488;
+  --accent: #7c9cff;
+  --accent-ink: #0b1020;
+  --ok: #4ade80;
+  --danger: #f87171;
+  --radius: 12px;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  color: var(--text);
+  background: radial-gradient(130% 130% at 50% -10%, var(--bg-1) 0%, var(--bg-0) 55%);
+  /* App chrome, not a document: no selection, no rubber-banding. */
+  user-select: none;
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Thin, unobtrusive scrollbars inside scrolling panes. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  background-clip: content-box;
+}
