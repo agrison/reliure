@@ -226,6 +226,21 @@ func (r *BookRepo) FindByTitleAuthor(title, author string) (int64, bool, error) 
 	return id, true, nil
 }
 
+// SetTitleSort sets a book's sort title. An empty value is allowed: ordering
+// then falls back to the title. Cheap update — no file moves, no FTS resync
+// (title_sort is not part of the search index).
+func (r *BookRepo) SetTitleSort(id int64, titleSort string) error {
+	res, err := r.db.Exec(`UPDATE book SET title_sort = ?, updated_at = ? WHERE id = ?`,
+		strings.TrimSpace(titleSort), now().Format(rfc3339), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // SetCover updates just a book's cached cover path.
 func (r *BookRepo) SetCover(bookID int64, coverPath string) error {
 	res, err := r.db.Exec(`UPDATE book SET cover_path = ?, updated_at = ? WHERE id = ?`,

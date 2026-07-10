@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SidebarItem, OPDSStatus } from "./api";
+  import type { SidebarItem, OPDSStatus, CalibreStatus } from "./api";
   import type { View } from "./types";
 
   let {
@@ -8,6 +8,7 @@
     series,
     tags,
     opds,
+    calibre,
     active,
     onSelect,
     onOpenSettings,
@@ -17,6 +18,7 @@
     series: SidebarItem[];
     tags: SidebarItem[];
     opds: OPDSStatus | null;
+    calibre: CalibreStatus | null;
     active: View;
     onSelect: (v: View) => void;
     onOpenSettings: () => void;
@@ -96,6 +98,23 @@
       <span class="lbl">OPDS {opds.running ? "en ligne" : "arrêté"}</span>
       {#if opds.running && opds.url}
         <span class="addr ellipsis">{shortURL(opds.url)}</span>
+      {/if}
+    </button>
+  {/if}
+
+  {#if calibre && calibre.running}
+    <button
+      class="opds"
+      class:on={calibre.connected}
+      onclick={onOpenSettings}
+      title={calibre.connected ? `Liseuse connectée : ${calibre.device}` : "Serveur liseuse en attente de connexion"}
+    >
+      <span class="dot"></span>
+      <span class="lbl">Liseuse {calibre.connected ? "connectée" : "en attente"}</span>
+      {#if calibre.connected && calibre.device}
+        <span class="addr ellipsis">{calibre.device}</span>
+      {:else if calibre.address}
+        <span class="addr ellipsis">{calibre.address}</span>
       {/if}
     </button>
   {/if}

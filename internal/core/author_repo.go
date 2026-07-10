@@ -90,6 +90,20 @@ func (r *AuthorRepo) List() ([]Author, error) {
 	return out, rows.Err()
 }
 
+// SetSortName sets an author's sort key. An empty value is allowed: listing and
+// KOReader sends then fall back to the display name.
+func (r *AuthorRepo) SetSortName(id int64, sortName string) error {
+	res, err := r.db.Exec(`UPDATE author SET sort_name = ? WHERE id = ?`,
+		strings.TrimSpace(sortName), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // Rename changes the name (and recomputes the derived sort key).
 func (r *AuthorRepo) Rename(id int64, newName string) error {
 	newName = strings.TrimSpace(newName)

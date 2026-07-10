@@ -1,25 +1,44 @@
 <script lang="ts">
-  import type { AppSettings, OPDSStatus } from "./api";
+  import type { AppSettings, OPDSStatus, CalibreStatus } from "./api";
 
   let {
     settings,
     opdsStatus,
+    calibre,
     onSetMode,
     onChooseFolder,
     onSetRemotePathTemplate,
     onSetOPDSEnabled,
     onSetOPDSPort,
+    onSetCalibreEnabled,
+    onSetWriteMetadataToFile,
+    onRegenerateCovers,
     onClose,
   }: {
     settings: AppSettings;
     opdsStatus: OPDSStatus;
+    calibre: CalibreStatus | null;
     onSetMode: (mode: "copy" | "reference") => void;
     onChooseFolder: () => void;
     onSetRemotePathTemplate: (tmpl: string) => void;
     onSetOPDSEnabled: (enabled: boolean) => void;
     onSetOPDSPort: (port: number) => void;
+    onSetCalibreEnabled: (enabled: boolean) => void;
+    onSetWriteMetadataToFile: (enabled: boolean) => void;
+    onRegenerateCovers: () => Promise<void> | void;
     onClose: () => void;
   } = $props();
+
+  let regenerating = $state(false);
+  async function regenerate() {
+    if (regenerating) return;
+    regenerating = true;
+    try {
+      await onRegenerateCovers();
+    } finally {
+      regenerating = false;
+    }
+  }
 
   let remotePathTemplate = $state("");
   let opdsPort = $state("");
@@ -100,6 +119,20 @@
     }}
   />
 
+  <label class="toggle mt">
+    <input
+      type="checkbox"
+      checked={settings.writeMetadataToFile}
+      onchange={(e) => onSetWriteMetadataToFile((e.target as HTMLInputElement).checked)}
+    />
+    <span>Écrire les métadonnées dans le fichier EPUB</span>
+  </label>
+  <p class="hint">
+    À l'enregistrement, réécrit l'OPF de l'EPUB pour que KOReader (qui lit le
+    fichier) affiche les valeurs de Reliure. Modifie le fichier sur le disque —
+    en mode « indexer sur place », il édite vos originaux.
+  </p>
+
   <h3 class="mt">Serveur OPDS</h3>
   <label class="toggle">
     <input
@@ -131,6 +164,39 @@
   {#if opdsStatus.error}
     <p class="error">{opdsStatus.error}</p>
   {/if}
+
+  <h3 class="mt">Liseuse (Calibre wireless)</h3>
+  <p class="hint">
+    Permet à KOReader de se connecter en WiFi pour recevoir des livres, en
+    respectant le chemin ci-dessus (sous-dossiers inclus).
+  </p>
+  <label class="toggle">
+    <input
+      type="checkbox"
+      checked={calibre?.running ?? false}
+      onchange={(e) => onSetCalibreEnabled((e.target as HTMLInputElement).checked)}
+    />
+    <span>Activer l'envoi vers la liseuse</span>
+    <strong>{calibre?.connected ? calibre.device || "Connectée" : calibre?.running ? "En attente" : "Arrêté"}</strong>
+  </label>
+  {#if calibre?.running}
+    <p class="hint">
+      Dans KOReader : Calibre → connexion sans fil (découverte automatique). Si
+      elle échoue, saisissez cette adresse&nbsp;:
+    </p>
+    <div class="folder">
+      <span class="path ellipsis" title={calibre.address}>{calibre.address || `port ${calibre.port}`}</span>
+    </div>
+  {/if}
+
+  <h3 class="mt">Maintenance</h3>
+  <button class="action" onclick={regenerate} disabled={regenerating}>
+    {regenerating ? "Génération…" : "Régénérer les vignettes manquantes"}
+  </button>
+  <p class="hint">
+    Génère une couverture pour les livres qui n'en ont pas (utile pour les PDF
+    importés avant cette fonctionnalité).
+  </p>
 </div>
 
 <style>
@@ -184,6 +250,25 @@
   }
   .mt {
     margin-top: 1.35rem;
+  }
+  .action {
+    width: 100%;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.86rem;
+    cursor: pointer;
+  }
+  .action:hover:not(:disabled) {
+    background: var(--surface-hi);
+    border-color: var(--border-hi);
+  }
+  .action:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
   .seg {
     display: grid;

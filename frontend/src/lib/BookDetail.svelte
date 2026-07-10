@@ -6,12 +6,23 @@
     onClose,
     onRemove,
     onSave,
+    onSetTitleSort,
+    onSetAuthorSort,
   }: {
     book: BookDetail;
     onClose: () => void;
     onRemove: (book: BookDetail) => Promise<void> | void;
     onSave: (update: BookUpdate) => Promise<void> | void;
+    onSetTitleSort: (sort: string) => Promise<void> | void;
+    onSetAuthorSort: (authorId: number, sort: string) => Promise<void> | void;
   } = $props();
+
+  function commitTitleSort(value: string) {
+    if (value.trim() !== (book.titleSort ?? "")) onSetTitleSort(value.trim());
+  }
+  function commitAuthorSort(id: number, current: string, value: string) {
+    if (value.trim() !== (current ?? "")) onSetAuthorSort(id, value.trim());
+  }
   let removing = $state(false);
   let confirming = $state(false);
   let editing = $state(false);
@@ -246,25 +257,37 @@
     {#if book.updatedAt}<div><dt>Modifié</dt><dd>{humanDate(book.updatedAt)}</dd></div>{/if}
   </dl>
 
-  {#if book.titleSort || book.authors?.some((a) => a.sortName)}
-    <div class="meta">
-      <h3>Tri</h3>
+  <div class="meta">
+    <h3>Tri (classement &amp; envoi)</h3>
+    <div class="sortrow">
+      <span class="sortlabel">Titre</span>
+      <input
+        class="sortinput"
+        value={book.titleSort}
+        placeholder="défaut : le titre"
+        onblur={(e) => commitTitleSort(e.currentTarget.value)}
+        onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      />
       {#if book.titleSort}
-        <div class="kv">
-          <span>Titre</span>
-          <strong>{book.titleSort}</strong>
-        </div>
-      {/if}
-      {#each book.authors ?? [] as a}
-        {#if a.sortName}
-          <div class="kv">
-            <span>{a.name}</span>
-            <strong>{a.sortName}</strong>
-          </div>
-        {/if}
-      {/each}
+        <button class="clearbtn" title="Effacer" aria-label="Effacer le tri du titre" onclick={() => onSetTitleSort("")}>×</button>
+      {:else}<span class="clearspacer"></span>{/if}
     </div>
-  {/if}
+    {#each book.authors ?? [] as a (a.id)}
+      <div class="sortrow">
+        <span class="sortlabel ellipsis" title={a.name}>{a.name}</span>
+        <input
+          class="sortinput"
+          value={a.sortName}
+          placeholder="défaut : le nom"
+          onblur={(e) => commitAuthorSort(a.id, a.sortName, e.currentTarget.value)}
+          onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        />
+        {#if a.sortName}
+          <button class="clearbtn" title="Effacer" aria-label={"Effacer le tri de " + a.name} onclick={() => onSetAuthorSort(a.id, "")}>×</button>
+        {:else}<span class="clearspacer"></span>{/if}
+      </div>
+    {/each}
+  </div>
 
   {#if book.remotePath}
     <div class="meta">
@@ -603,6 +626,55 @@
 
   .meta {
     margin-top: 1.5rem;
+  }
+  .sortrow {
+    display: grid;
+    grid-template-columns: minmax(70px, 0.5fr) minmax(0, 1fr) 22px;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.25rem 0;
+  }
+  .sortlabel {
+    color: var(--faint);
+    font-size: 0.76rem;
+    min-width: 0;
+  }
+  .sortinput {
+    width: 100%;
+    min-width: 0;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.82rem;
+    outline: none;
+    user-select: text;
+  }
+  .sortinput:focus {
+    border-color: var(--border-hi);
+    background: var(--surface-hi);
+  }
+  .clearbtn {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 50%;
+    background: var(--surface-hi);
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .clearbtn:hover {
+    background: color-mix(in srgb, var(--danger) 22%, var(--surface-hi));
+    color: var(--text);
+  }
+  .clearspacer {
+    width: 22px;
   }
   .kv {
     display: grid;

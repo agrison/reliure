@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/agrison/reliure/frontend"
+	"github.com/agrison/reliure/internal/calibre"
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/opds"
 	"github.com/agrison/reliure/internal/settings"
@@ -64,6 +65,22 @@ func main() {
 		_ = opdsSvc.shutdown(ctx)
 	}()
 
+	// Calibre wireless (push) server. Connection changes are pushed to the UI
+	// as "calibre:status" events (full status, incl. port/address) so the
+	// sidebar reflects the connected reader.
+	calibreSvc := &CalibreService{db: db, settings: store}
+	emitCalibreStatus := func() {
+		application.Get().Event.Emit(calibreStatusEvent, calibreSvc.Status())
+	}
+	calibreSvc.server = calibre.NewServer(calibre.ServerConfig{
+		LibraryName:  "Reliure",
+		LibraryUUID:  "reliure-library",
+		OnConnect:    func(string) { emitCalibreStatus() },
+		OnDisconnect: func() { emitCalibreStatus() },
+	})
+	calibreSvc.startFromSettings()
+	defer calibreSvc.shutdown()
+
 	app := application.New(application.Options{
 		Name:        "Reliure",
 		Description: "Bibliothèque ebook multiplateforme",
@@ -72,6 +89,7 @@ func main() {
 			application.NewService(libSvc),
 			application.NewService(&SettingsService{store: store}),
 			application.NewService(opdsSvc),
+			application.NewService(calibreSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(coverDir),

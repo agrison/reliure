@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agrison/reliure/internal/core"
+	"github.com/agrison/reliure/internal/formats"
 	"github.com/agrison/reliure/internal/library"
 )
 
@@ -30,6 +32,7 @@ type BookCard struct {
 
 // Contributor is a named author/role pair for the detail view.
 type Contributor struct {
+	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	SortName string `json:"sortName"`
 	Role     string `json:"role"`
@@ -249,7 +252,7 @@ func (s *LibraryService) Book(id int64) (BookDetail, error) {
 		RemotePath:                remotePath(s.settings.Get().RemotePathTemplate, b),
 	}
 	for _, c := range b.Authors {
-		d.Authors = append(d.Authors, Contributor{Name: c.Author.Name, SortName: c.Author.SortName, Role: c.Role})
+		d.Authors = append(d.Authors, Contributor{ID: c.Author.ID, Name: c.Author.Name, SortName: c.Author.SortName, Role: c.Role})
 	}
 	for _, t := range b.Tags {
 		d.Tags = append(d.Tags, t.Name)
@@ -295,7 +298,82 @@ func (s *LibraryService) UpdateBook(in BookUpdate) (BookDetail, error) {
 			return BookDetail{}, err
 		}
 	}
+
+	s.maybeWriteMetadata(in.ID)
 	return s.Book(in.ID)
+}
+
+// SetTitleSort updates just a book's sort title (empty clears it) and, if
+// enabled, mirrors it into the ebook file.
+func (s *LibraryService) SetTitleSort(bookID int64, sort string) (BookDetail, error) {
+	if err := s.db.Books.SetTitleSort(bookID, sort); err != nil {
+		return BookDetail{}, err
+	}
+	s.maybeWriteMetadata(bookID)
+	return s.Book(bookID)
+}
+
+// SetAuthorSort updates an author's sort name (empty clears it, so sends fall
+// back to the display name) and mirrors the change into the given book's file
+// if enabled. Note the author's sort name is shared across all their books.
+func (s *LibraryService) SetAuthorSort(bookID, authorID int64, sort string) (BookDetail, error) {
+	if err := s.db.Authors.SetSortName(authorID, sort); err != nil {
+		return BookDetail{}, err
+	}
+	s.maybeWriteMetadata(bookID)
+	return s.Book(bookID)
+}
+
+// CoverResult summarizes a cover-regeneration run.
+type CoverResult struct {
+	Scanned int `json:"scanned"`
+	Updated int `json:"updated"`
+}
+
+// RegenerateCovers builds a cached thumbnail for every book that lacks one
+// (e.g. PDFs imported before cover extraction existed). Books whose file yields
+// no image are left without a cover.
+func (s *LibraryService) RegenerateCovers() (CoverResult, error) {
+	books, err := s.db.Books.List(0, 0)
+	if err != nil {
+		return CoverResult{}, err
+	}
+	var res CoverResult
+	for _, b := range books {
+		if b.CoverPath != "" {
+			continue
+		}
+		res.Scanned++
+		name, err := library.GenerateCover(formats.Default, s.coverDir, library.DefaultThumbnailMax, b)
+		if err != nil {
+			slog.Warn("regenerate cover failed", "book", b.ID, "err", err)
+			continue
+		}
+		if name == "" {
+			continue
+		}
+		if err := s.db.Books.SetCover(b.ID, name); err == nil {
+			res.Updated++
+		}
+	}
+	slog.Info("regenerate covers done", "scanned", res.Scanned, "updated", res.Updated)
+	return res, nil
+}
+
+// maybeWriteMetadata writes a book's current metadata into its ebook files when
+// the user has opted in. Best-effort: a failure is logged, not fatal (the DB is
+// the source of truth and is already updated).
+func (s *LibraryService) maybeWriteMetadata(bookID int64) {
+	if !s.settings.Get().WriteMetadataToFile {
+		return
+	}
+	fresh, err := s.db.Books.ByID(bookID)
+	if err != nil {
+		return
+	}
+	if err := library.WriteFileMetadata(formats.Default, fresh); err != nil {
+		slog.Warn("write metadata to file failed", "book", bookID, "err", err)
+	}
 }
 
 // BatchSetSeries assigns or clears a series for selected books. It does not

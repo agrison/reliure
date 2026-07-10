@@ -39,6 +39,14 @@ type BookMetadata struct {
 	Tags         []string
 }
 
+// MetadataWriter is an optional capability a FormatHandler may also implement:
+// writing metadata back into the file on disk. The library checks for it with a
+// type assertion, so formats that can't write (yet) simply don't implement it.
+type MetadataWriter interface {
+	// WriteMetadata rewrites the file's embedded metadata to match md, in place.
+	WriteMetadata(path string, md BookMetadata) error
+}
+
 // FormatHandler reads a single ebook format. Implementations must be safe to
 // call concurrently and must not panic on malformed input.
 type FormatHandler interface {

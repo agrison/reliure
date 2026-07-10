@@ -27,6 +27,14 @@ type Settings struct {
 	OPDSEnabled bool `json:"opdsEnabled"`
 	// OPDSPort is the TCP port used by the local OPDS catalog.
 	OPDSPort int `json:"opdsPort"`
+	// CalibreEnabled controls whether the Calibre wireless (push) server starts
+	// with the app, so KOReader can connect to send/receive books.
+	CalibreEnabled bool `json:"calibreEnabled"`
+	// WriteMetadataToFile, when true, writes edited metadata back into the ebook
+	// file (rewrites the EPUB's OPF) on save, so readers that read the file
+	// directly (e.g. KOReader's file browser) see Reliure's values. Off by
+	// default: it modifies files on disk, including referenced originals.
+	WriteMetadataToFile bool `json:"writeMetadataToFile"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.

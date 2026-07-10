@@ -60,10 +60,6 @@ func (Handler) Metadata(path string) (formats.BookMetadata, error) {
 	return md, nil
 }
 
-// Cover returns nil: PDF cover rasterization would require a rendering engine,
-// which is intentionally outside the current lightweight parser.
-func (Handler) Cover(string) ([]byte, error) { return nil, nil }
-
 func readScanBytes(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {

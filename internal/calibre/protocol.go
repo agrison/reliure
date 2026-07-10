@@ -23,26 +23,26 @@ import (
 type Opcode int
 
 const (
-	OpNoop                 Opcode = 12
-	OpOK                   Opcode = 0
-	OpBookDone             Opcode = 11
-	OpCalibreBusy          Opcode = 18
-	OpSetLibraryInfo       Opcode = 19
-	OpDeleteBook           Opcode = 13
-	OpDisplayMessage       Opcode = 17
-	OpError                Opcode = 20
-	OpFreeSpace            Opcode = 5
-	OpGetBookFileSegment   Opcode = 14
-	OpGetBookMetadata      Opcode = 15
-	OpGetBookCount         Opcode = 6
-	OpGetDeviceInformation Opcode = 3
+	OpNoop                  Opcode = 12
+	OpOK                    Opcode = 0
+	OpBookDone              Opcode = 11
+	OpCalibreBusy           Opcode = 18
+	OpSetLibraryInfo        Opcode = 19
+	OpDeleteBook            Opcode = 13
+	OpDisplayMessage        Opcode = 17
+	OpError                 Opcode = 20
+	OpFreeSpace             Opcode = 5
+	OpGetBookFileSegment    Opcode = 14
+	OpGetBookMetadata       Opcode = 15
+	OpGetBookCount          Opcode = 6
+	OpGetDeviceInformation  Opcode = 3
 	OpGetInitializationInfo Opcode = 9
-	OpSendBooklists        Opcode = 7
-	OpSendBook             Opcode = 8
-	OpSendBookMetadata     Opcode = 16
-	OpSetCalibreDeviceInfo Opcode = 1
-	OpSetCalibreDeviceName Opcode = 2
-	OpTotalSpace           Opcode = 4
+	OpSendBooklists         Opcode = 7
+	OpSendBook              Opcode = 8
+	OpSendBookMetadata      Opcode = 16
+	OpSetCalibreDeviceInfo  Opcode = 1
+	OpSetCalibreDeviceName  Opcode = 2
+	OpTotalSpace            Opcode = 4
 )
 
 const (

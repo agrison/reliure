@@ -4,12 +4,15 @@
   import {
     LibraryService,
     OPDSService,
+    CalibreService,
     SettingsService,
     type BookCard,
     type BookDetail,
     type SidebarItem,
     type AppSettings,
     type OPDSStatus,
+    type CalibreStatus,
+    type CalibreSendProgress,
     type ImportProgress,
     type ImportSummary,
   } from "./lib/api";
@@ -43,6 +46,8 @@
   let detail = $state<BookDetail | null>(null);
   let settings = $state<AppSettings | null>(null);
   let opdsStatus = $state<OPDSStatus | null>(null);
+  let calibre = $state<CalibreStatus | null>(null);
+  let sending = $state(false);
   let settingsOpen = $state(false);
 
   let importing = $state(false);
@@ -178,6 +183,27 @@
     }
   }
 
+  async function setTitleSort(sort: string) {
+    if (!detail) return;
+    try {
+      detail = await LibraryService.SetTitleSort(detail.id, sort);
+      await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
+  async function setAuthorSort(authorId: number, sort: string) {
+    if (!detail) return;
+    try {
+      detail = await LibraryService.SetAuthorSort(detail.id, authorId, sort);
+      await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
+
   function toggleSelect(id: number) {
     selectedIds = selectedIds.includes(id)
       ? selectedIds.filter((x) => x !== id)
@@ -240,6 +266,22 @@
   async function setRemotePathTemplate(tmpl: string) {
     settings = await SettingsService.SetRemotePathTemplate(tmpl);
   }
+  async function setWriteMetadataToFile(enabled: boolean) {
+    settings = await SettingsService.SetWriteMetadataToFile(enabled);
+  }
+  async function regenerateCovers() {
+    try {
+      const res = await LibraryService.RegenerateCovers();
+      toast = res.updated
+        ? `${res.updated} vignette${res.updated === 1 ? "" : "s"} générée${res.updated === 1 ? "" : "s"}`
+        : "Aucune vignette à générer";
+      setTimeout(() => (toast = ""), 5000);
+      await loadBooks();
+    } catch (e) {
+      toast = `Régénération impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
   async function setOPDSEnabled(enabled: boolean) {
     opdsStatus = await OPDSService.SetEnabled(enabled);
     settings = await SettingsService.Get();
@@ -248,11 +290,42 @@
     opdsStatus = await OPDSService.SetPort(port);
     settings = await SettingsService.Get();
   }
+  async function setCalibreEnabled(enabled: boolean) {
+    calibre = await CalibreService.SetEnabled(enabled);
+  }
+
+  async function sendToDevice() {
+    if (sending || selectedIds.length === 0) return;
+    const orderedIds = books.map((b) => b.id).filter((id) => selectedIds.includes(id));
+    sending = true;
+    try {
+      const res = await CalibreService.SendBooks(orderedIds);
+      toast =
+        `${res.sent} envoyé${res.sent === 1 ? "" : "s"} vers la liseuse` +
+        (res.failed ? ` · ${res.failed} échec${res.failed === 1 ? "" : "s"}` : "");
+      setTimeout(() => (toast = ""), 6000);
+      clearSelection();
+    } catch (e) {
+      toast = `Envoi impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    } finally {
+      sending = false;
+    }
+  }
 
   onMount(() => {
     loadSidebar();
     loadBooks();
     OPDSService.Status().then((s) => (opdsStatus = s)).catch(() => {});
+    CalibreService.Status().then((s) => (calibre = s)).catch(() => {});
+
+    const offCalibre = Events.On("calibre:status", (e: { data: CalibreStatus }) => {
+      calibre = e.data;
+    });
+    const offCalibreProgress = Events.On("calibre:progress", (e: { data: CalibreSendProgress }) => {
+      const p = e.data;
+      toast = `Envoi ${p.done}/${p.total} · ${p.title}${p.ok ? "" : " (échec)"}`;
+    });
 
     const offProgress = Events.On("import:progress", (e: { data: ImportProgress }) => {
       importing = true;
@@ -272,6 +345,8 @@
       loadBooks();
     });
     return () => {
+      offCalibre();
+      offCalibreProgress();
       offProgress();
       offDone();
     };
@@ -307,6 +382,7 @@
     {series}
     {tags}
     opds={opdsStatus}
+    {calibre}
     active={view}
     onSelect={selectView}
     onOpenSettings={openSettings}
@@ -390,6 +466,11 @@
         <input bind:value={batchSeries} placeholder="Série" aria-label="Série" />
         <input class="small" bind:value={batchSeriesStart} placeholder="Tome départ" aria-label="Tome de départ" />
         <button onclick={applyBatchSeries}>Assigner</button>
+        {#if calibre?.connected}
+          <button class="send" onclick={sendToDevice} disabled={sending}>
+            {sending ? "Envoi…" : `Envoyer vers ${calibre.device || "la liseuse"}`}
+          </button>
+        {/if}
         <button class="ghost" onclick={clearSelection}>Annuler</button>
       </div>
     {/if}
@@ -429,18 +510,29 @@
 </div>
 
 {#if detail}
-  <BookDetailView book={detail} onClose={() => (detail = null)} onRemove={removeBook} onSave={saveBook} />
+  <BookDetailView
+    book={detail}
+    onClose={() => (detail = null)}
+    onRemove={removeBook}
+    onSave={saveBook}
+    onSetTitleSort={setTitleSort}
+    onSetAuthorSort={setAuthorSort}
+  />
 {/if}
 
 {#if settingsOpen && settings && opdsStatus}
   <SettingsModal
     {settings}
     {opdsStatus}
+    {calibre}
     onSetMode={setMode}
     onChooseFolder={chooseFolder}
     onSetRemotePathTemplate={setRemotePathTemplate}
     onSetOPDSEnabled={setOPDSEnabled}
     onSetOPDSPort={setOPDSPort}
+    onSetCalibreEnabled={setCalibreEnabled}
+    onSetWriteMetadataToFile={setWriteMetadataToFile}
+    onRegenerateCovers={regenerateCovers}
     onClose={() => (settingsOpen = false)}
   />
 {/if}
@@ -663,6 +755,18 @@
     background: transparent;
     color: var(--muted);
     font-weight: 500;
+  }
+  .batchbar button.send {
+    background: transparent;
+    color: var(--ok);
+    border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--border));
+  }
+  .batchbar button.send:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ok) 14%, transparent);
+  }
+  .batchbar button.send:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
   .progress .fill {
     position: absolute;

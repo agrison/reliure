@@ -15,20 +15,22 @@ type SettingsService struct {
 
 // AppSettings is the frontend-facing settings shape (flat, JSON-friendly).
 type AppSettings struct {
-	ImportMode         string `json:"importMode"` // "copy" | "reference"
-	LibraryDir         string `json:"libraryDir"`
-	RemotePathTemplate string `json:"remotePathTemplate"`
-	OPDSEnabled        bool   `json:"opdsEnabled"`
-	OPDSPort           int    `json:"opdsPort"`
+	ImportMode          string `json:"importMode"` // "copy" | "reference"
+	LibraryDir          string `json:"libraryDir"`
+	RemotePathTemplate  string `json:"remotePathTemplate"`
+	OPDSEnabled         bool   `json:"opdsEnabled"`
+	OPDSPort            int    `json:"opdsPort"`
+	WriteMetadataToFile bool   `json:"writeMetadataToFile"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
 	return AppSettings{
-		ImportMode:         string(s.ImportMode),
-		LibraryDir:         s.LibraryDir,
-		RemotePathTemplate: s.RemotePathTemplate,
-		OPDSEnabled:        s.OPDSEnabled,
-		OPDSPort:           s.OPDSPort,
+		ImportMode:          string(s.ImportMode),
+		LibraryDir:          s.LibraryDir,
+		RemotePathTemplate:  s.RemotePathTemplate,
+		OPDSEnabled:         s.OPDSEnabled,
+		OPDSPort:            s.OPDSPort,
+		WriteMetadataToFile: s.WriteMetadataToFile,
 	}
 }
 
@@ -68,6 +70,15 @@ func (s *SettingsService) ChooseLibraryFolder() (AppSettings, error) {
 func (s *SettingsService) SetRemotePathTemplate(tmpl string) (AppSettings, error) {
 	cur := s.store.Get()
 	cur.RemotePathTemplate = tmpl
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
+// SetWriteMetadataToFile toggles writing edited metadata back into ebook files
+// on save.
+func (s *SettingsService) SetWriteMetadataToFile(enabled bool) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.WriteMetadataToFile = enabled
 	next, err := s.store.Update(cur)
 	return toAppSettings(next), err
 }

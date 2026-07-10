@@ -12,6 +12,8 @@ import type * as main$0 from "../../../../agrison/reliure/cmd/app/models.js";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "calibre:progress": main$0.CalibreSendProgress;
+            "calibre:status": main$0.CalibreStatus;
             "import:done": main$0.ImportSummary;
             "import:progress": main$0.ImportProgress;
         }

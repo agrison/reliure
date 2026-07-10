@@ -13,6 +13,7 @@ export interface AppSettings {
     "remotePathTemplate": string;
     "opdsEnabled": boolean;
     "opdsPort": number;
+    "writeMetadataToFile": boolean;
 }
 
 /**
@@ -92,12 +93,48 @@ export interface BookUpdate {
 }
 
 /**
+ * CalibreSendProgress is emitted once per book while sending to the device.
+ */
+export interface CalibreSendProgress {
+    "total": number;
+    "done": number;
+    "title": string;
+    "ok": boolean;
+    "error"?: string;
+}
+
+/**
+ * CalibreStatus is the frontend-facing push-server state.
+ */
+export interface CalibreStatus {
+    "running": boolean;
+    "connected": boolean;
+    "device": string;
+    "port": number;
+
+    /**
+     * Address is the LAN host:port KOReader can be pointed at manually if
+     * UDP auto-discovery does not work (e.g. across subnets).
+     */
+    "address": string;
+}
+
+/**
  * Contributor is a named author/role pair for the detail view.
  */
 export interface Contributor {
+    "id": number;
     "name": string;
     "sortName": string;
     "role": string;
+}
+
+/**
+ * CoverResult summarizes a cover-regeneration run.
+ */
+export interface CoverResult {
+    "scanned": number;
+    "updated": number;
 }
 
 /**
@@ -170,6 +207,14 @@ export interface RemoveBookResult {
     "removedFromIndex": number;
     "trashedFiles": number;
     "keptFiles": number;
+}
+
+/**
+ * SendResult summarizes a send-to-device run.
+ */
+export interface SendResult {
+    "sent": number;
+    "failed": number;
 }
 
 /**

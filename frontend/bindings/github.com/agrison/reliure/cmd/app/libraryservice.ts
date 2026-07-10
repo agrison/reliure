@@ -116,6 +116,15 @@ export function ImportPaths(paths: string[] | null): $CancellablePromise<$models
 }
 
 /**
+ * RegenerateCovers builds a cached thumbnail for every book that lacks one
+ * (e.g. PDFs imported before cover extraction existed). Books whose file yields
+ * no image are left without a cover.
+ */
+export function RegenerateCovers(): $CancellablePromise<$models.CoverResult> {
+    return $Call.ByID(1789265036);
+}
+
+/**
  * RemoveBook removes a book from the library index. Files stored inside the
  * managed LibraryDir are moved to the system trash first; files outside that
  * tree are left untouched and only disappear from Reliure's index.
@@ -144,6 +153,23 @@ export function SeriesGroups(): $CancellablePromise<$models.SidebarItem[] | null
  */
 export function SeriesList(): $CancellablePromise<$models.SidebarItem[] | null> {
     return $Call.ByID(812942751);
+}
+
+/**
+ * SetAuthorSort updates an author's sort name (empty clears it, so sends fall
+ * back to the display name) and mirrors the change into the given book's file
+ * if enabled. Note the author's sort name is shared across all their books.
+ */
+export function SetAuthorSort(bookID: number, authorID: number, sort: string): $CancellablePromise<$models.BookDetail> {
+    return $Call.ByID(4019727117, bookID, authorID, sort);
+}
+
+/**
+ * SetTitleSort updates just a book's sort title (empty clears it) and, if
+ * enabled, mirrors it into the ebook file.
+ */
+export function SetTitleSort(bookID: number, sort: string): $CancellablePromise<$models.BookDetail> {
+    return $Call.ByID(789912444, bookID, sort);
 }
 
 /**

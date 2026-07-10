@@ -45,3 +45,11 @@ export function SetImportMode(mode: string): $CancellablePromise<$models.AppSett
 export function SetRemotePathTemplate(tmpl: string): $CancellablePromise<$models.AppSettings> {
     return $Call.ByID(3717326007, tmpl);
 }
+
+/**
+ * SetWriteMetadataToFile toggles writing edited metadata back into ebook files
+ * on save.
+ */
+export function SetWriteMetadataToFile(enabled: boolean): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(2744555517, enabled);
+}
