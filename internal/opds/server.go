@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
@@ -44,10 +45,12 @@ func (s *Server) Start(host string, port int) error {
 	}
 	s.server = srv
 	s.ln = ln
+	slog.Info("opds: server started", "addr", ln.Addr().String())
 	go func() {
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			// The caller observes failed starts synchronously; runtime failures
-			// are reflected by Status on the next UI refresh.
+			// Failed starts are observed synchronously by the caller; a runtime
+			// failure here (e.g. the listener dying) is otherwise silent.
+			slog.Error("opds: server stopped unexpectedly", "err", err)
 		}
 	}()
 	return nil
@@ -63,6 +66,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	if srv == nil {
 		return nil
 	}
+	slog.Info("opds: server stopping")
 	return srv.Shutdown(ctx)
 }
 

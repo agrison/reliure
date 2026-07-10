@@ -307,6 +307,7 @@
   .scrim {
     position: fixed;
     inset: 0;
+    z-index: 40;
     background: rgba(0, 0, 0, 0.5);
     animation: fade 0.15s ease;
   }
@@ -314,6 +315,7 @@
     position: fixed;
     top: 0;
     right: 0;
+    z-index: 41;
     height: 100%;
     width: min(420px, 92vw);
     padding: 2rem 1.75rem;

@@ -5,8 +5,9 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,6 +31,9 @@ type HandlerConfig struct {
 	CoverDir string
 	Title    string
 	Now      func() time.Time
+	// Logger receives one structured record per request plus download details.
+	// Defaults to slog.Default().
+	Logger *slog.Logger
 }
 
 // NewHandler returns a standalone OPDS HTTP handler. It owns only OPDS routes;
@@ -41,7 +45,10 @@ func NewHandler(cfg HandlerConfig) http.Handler {
 	if cfg.Now == nil {
 		cfg.Now = func() time.Time { return time.Now().UTC() }
 	}
-	h := &handler{cfg: cfg}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
+	h := &handler{cfg: cfg, log: cfg.Logger.With("component", "opds")}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", h.root)
 	mux.HandleFunc("/recent", h.recent)
@@ -53,11 +60,12 @@ func NewHandler(cfg HandlerConfig) http.Handler {
 	mux.HandleFunc("/opensearch.xml", h.openSearch)
 	mux.HandleFunc("/books/", h.bookFile)
 	mux.HandleFunc("/covers/", h.cover)
-	return mux
+	return logging(h.log, mux)
 }
 
 type handler struct {
 	cfg HandlerConfig
+	log *slog.Logger
 }
 
 func (h *handler) root(w http.ResponseWriter, r *http.Request) {
@@ -202,9 +210,9 @@ func (h *handler) bookFile(w http.ResponseWriter, r *http.Request) {
 		name := safeDownloadName(b.Title) + ".epub"
 		w.Header().Set("Content-Type", epubType)
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
+		h.log.Info("download", "book", b.ID, "file", f.ID, "title", b.Title,
+			"name", name, "remote", clientIP(r))
 		http.ServeFile(w, r, f.Path)
-	
-		print("Downloaded file " + name)
 		return
 	}
 	http.NotFound(w, r)
@@ -295,6 +303,50 @@ func safeDownloadName(name string) string {
 	}
 	replacer := strings.NewReplacer("/", "-", `\`, "-", ":", "-", "\x00", "")
 	return replacer.Replace(name)
+}
+
+// logging wraps a handler, emitting one structured record per request with the
+// method, path, response status, byte count, client and duration.
+func logging(l *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		l.Info("request",
+			"method", r.Method,
+			"path", r.URL.RequestURI(),
+			"status", rec.status,
+			"bytes", rec.bytes,
+			"remote", clientIP(r),
+			"dur", time.Since(start).Round(time.Millisecond).String(),
+		)
+	})
+}
+
+// statusRecorder captures the status code and byte count of a response.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	n, err := r.ResponseWriter.Write(b)
+	r.bytes += n
+	return n, err
+}
+
+// clientIP returns the request's remote IP without the port.
+func clientIP(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func writeFeed(w http.ResponseWriter, f feed) {

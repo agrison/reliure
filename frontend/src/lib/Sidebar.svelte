@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SidebarItem } from "./api";
+  import type { SidebarItem, OPDSStatus } from "./api";
   import type { View } from "./types";
 
   let {
@@ -7,6 +7,7 @@
     authors,
     series,
     tags,
+    opds,
     active,
     onSelect,
     onOpenSettings,
@@ -15,10 +16,16 @@
     authors: SidebarItem[];
     series: SidebarItem[];
     tags: SidebarItem[];
+    opds: OPDSStatus | null;
     active: View;
     onSelect: (v: View) => void;
     onOpenSettings: () => void;
   } = $props();
+
+  // "http://192.168.1.10:8080/" → "192.168.1.10:8080" for a compact status line.
+  function shortURL(url: string): string {
+    return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  }
 
   // Which groups are expanded. Authors open by default.
   let open = $state({ author: true, series: false, tag: false });
@@ -77,6 +84,21 @@
       </div>
     {/each}
   </nav>
+
+  {#if opds && (opds.enabled || opds.running)}
+    <button
+      class="opds"
+      class:on={opds.running}
+      onclick={onOpenSettings}
+      title={opds.running ? opds.url : opds.error || "Serveur OPDS arrêté"}
+    >
+      <span class="dot"></span>
+      <span class="lbl">OPDS {opds.running ? "en ligne" : "arrêté"}</span>
+      {#if opds.running && opds.url}
+        <span class="addr ellipsis">{shortURL(opds.url)}</span>
+      {/if}
+    </button>
+  {/if}
 
   <button class="settings" onclick={onOpenSettings}>
     <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"
@@ -201,6 +223,46 @@
     white-space: nowrap;
   }
 
+  .opds {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    margin-top: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--muted);
+    text-align: left;
+    font-size: 0.8rem;
+  }
+  .opds:hover {
+    background: var(--surface-hi);
+    border-color: var(--border-hi);
+  }
+  .opds .dot {
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--faint);
+  }
+  .opds.on .dot {
+    background: var(--ok);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
+  }
+  .opds.on .lbl {
+    color: var(--text);
+  }
+  .opds .addr {
+    margin-left: auto;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+    max-width: 105px;
+  }
+
   .settings {
     flex: none;
     display: flex;
@@ -208,7 +270,7 @@
     gap: 0.5rem;
     width: 100%;
     padding: 0.55rem 0.6rem;
-    margin-top: 0.65rem;
+    margin-top: 0.5rem;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface);

@@ -252,6 +252,7 @@
   onMount(() => {
     loadSidebar();
     loadBooks();
+    OPDSService.Status().then((s) => (opdsStatus = s)).catch(() => {});
 
     const offProgress = Events.On("import:progress", (e: { data: ImportProgress }) => {
       importing = true;
@@ -305,6 +306,7 @@
     {authors}
     {series}
     {tags}
+    opds={opdsStatus}
     active={view}
     onSelect={selectView}
     onOpenSettings={openSettings}
@@ -708,6 +710,7 @@
     position: fixed;
     bottom: 1.5rem;
     left: 50%;
+    z-index: 60;
     transform: translateX(-50%);
     padding: 0.7rem 1.2rem;
     background: var(--panel);
@@ -727,6 +730,7 @@
   .dropzone {
     position: fixed;
     inset: 0;
+    z-index: 70;
     display: grid;
     place-items: center;
     background: rgba(10, 12, 20, 0.55);

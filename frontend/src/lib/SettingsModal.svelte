@@ -137,12 +137,14 @@
   .scrim {
     position: fixed;
     inset: 0;
+    z-index: 50;
     background: rgba(0, 0, 0, 0.5);
   }
   .modal {
     position: fixed;
     top: 50%;
     left: 50%;
+    z-index: 51;
     transform: translate(-50%, -50%);
     width: min(460px, 92vw);
     padding: 1.5rem 1.75rem 1.75rem;
