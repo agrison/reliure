@@ -76,8 +76,8 @@ erDiagram
     }
 
     BOOK_AUTHOR {
-        INTEGER book_id PK FK
-        INTEGER author_id PK FK
+        INTEGER book_id PK
+        INTEGER author_id PK
         TEXT role PK
         INTEGER position
     }
@@ -88,8 +88,8 @@ erDiagram
     }
 
     BOOK_TAG {
-        INTEGER book_id PK FK
-        INTEGER tag_id PK FK
+        INTEGER book_id PK
+        INTEGER tag_id PK
     }
 
     FILE {
@@ -103,7 +103,7 @@ erDiagram
     }
 
     READING_STATE {
-        INTEGER book_id PK FK
+        INTEGER book_id PK
         REAL percent
         INTEGER pages
         TEXT status
@@ -134,6 +134,10 @@ erDiagram
         INTEGER version
     }
 ```
+
+Mermaid's GitHub renderer accepts one key marker per attribute, so composite
+primary-key columns are marked `PK` only in the diagram. The relationships above
+show the foreign-key links.
 
 ### Tables
 
