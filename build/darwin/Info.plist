@@ -4,26 +4,24 @@
         <key>CFBundlePackageType</key>
             <string>APPL</string>
         <key>CFBundleName</key>
-            <string>My Product</string>
+            <string>Reliure</string>
         <key>CFBundleExecutable</key>
-            <string>reliureref</string>
+            <string>reliure</string>
         <key>CFBundleIdentifier</key>
-            <string>com.example.reliureref</string>
+            <string>com.agrison.reliure</string>
         <key>CFBundleVersion</key>
-            <string>0.1.0</string>
+            <string>0.0.1</string>
         <key>CFBundleGetInfoString</key>
-            <string>This is a comment</string>
+            <string>Gestion de bibliothèque EPUB (Wails v3 + Go)</string>
         <key>CFBundleShortVersionString</key>
-            <string>0.1.0</string>
+            <string>0.0.1</string>
         <key>CFBundleIconFile</key>
             <string>icons</string>
-        <key>CFBundleIconName</key>
-            <string>appicon</string>
         <key>LSMinimumSystemVersion</key>
             <string>15.0.0</string>
         <key>NSHighResolutionCapable</key>
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
-            <string>© 2026, My Company</string>
+            <string>(c) 2026, Agrison</string>
     </dict>
 </plist>

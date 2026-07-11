@@ -2,6 +2,7 @@ package formats
 
 import (
 	"bytes"
+	"encoding/base64"
 	"image"
 	"image/color"
 	"image/png"
@@ -51,6 +52,27 @@ func TestThumbnailNoUpscale(t *testing.T) {
 	}
 	if cfg.Width != 40 || cfg.Height != 50 {
 		t.Errorf("small image should not upscale: %dx%d", cfg.Width, cfg.Height)
+	}
+}
+
+func TestThumbnailAcceptsWebP(t *testing.T) {
+	raw, err := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := Thumbnail(raw, 100)
+	if err != nil {
+		t.Fatalf("Thumbnail WebP: %v", err)
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(out))
+	if err != nil {
+		t.Fatalf("decode thumbnail: %v", err)
+	}
+	if format != "jpeg" {
+		t.Errorf("thumbnail format = %q, want jpeg", format)
+	}
+	if cfg.Width != 1 || cfg.Height != 1 {
+		t.Errorf("thumbnail dims = %dx%d, want 1x1", cfg.Width, cfg.Height)
 	}
 }
 

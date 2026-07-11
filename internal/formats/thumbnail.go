@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 
 	// Register decoders so image.Decode handles the formats covers use.
+	_ "golang.org/x/image/webp"
 	_ "image/gif"
 	_ "image/png"
 
@@ -19,9 +20,9 @@ const thumbnailQuality = 82
 
 // Thumbnail decodes a raw cover image and returns a JPEG thumbnail scaled so its
 // largest side is at most maxDim pixels, preserving aspect ratio. Images already
-// within bounds are re-encoded without upscaling. Input may be JPEG/PNG/GIF;
-// output is always JPEG. It is format-agnostic so every FormatHandler's covers
-// share one thumbnail path.
+// within bounds are re-encoded without upscaling. Input may be JPEG, PNG, GIF,
+// or WebP; output is always JPEG. It is format-agnostic so every FormatHandler's
+// covers share one thumbnail path.
 func Thumbnail(raw []byte, maxDim int) ([]byte, error) {
 	if maxDim <= 0 {
 		return nil, errors.New("thumbnail: maxDim must be positive")

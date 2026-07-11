@@ -340,8 +340,21 @@ func TestCanHandleAndFormat(t *testing.T) {
 	if h.Format() != "epub" {
 		t.Errorf("format = %q", h.Format())
 	}
-	if !h.CanHandle("/x/Book.EPUB") || h.CanHandle("/x/book.pdf") {
-		t.Error("CanHandle wrong")
+	cases := map[string]bool{
+		"/x/Book.EPUB":          true,
+		"/x/book.epub.images":   true,
+		"/x/book.epub.noimages": true,
+		"/x/book.epub3":         true,
+		"/x/book.epub3.images":  true,
+		"/x/book.kepub":         true,
+		"/x/book.kepub.epub":    true,
+		"/x/book.pdf":           false,
+		"/x/book.images":        false,
+	}
+	for path, want := range cases {
+		if got := h.CanHandle(path); got != want {
+			t.Errorf("CanHandle(%q) = %v, want %v", path, got, want)
+		}
 	}
 }
 

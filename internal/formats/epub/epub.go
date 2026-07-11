@@ -39,8 +39,17 @@ func init() { formats.Default.Register(New()) }
 // Format returns the identifier stored on files.
 func (Handler) Format() string { return "epub" }
 
-// CanHandle recognises files by the .epub extension (cheap, per the contract).
-func (Handler) CanHandle(path string) bool { return formats.HasExt(path, ".epub") }
+// CanHandle recognises EPUB containers and common EPUB-derived extensions
+// (cheap, per the contract).
+func (Handler) CanHandle(path string) bool {
+	name := strings.ToLower(filepath.Base(path))
+	for _, suffix := range []string{".epub", ".epub.images", ".epub.noimages", ".epub3", ".epub3.images", ".kepub"} {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+	return false
+}
 
 // Metadata parses the EPUB at path. It never panics and always returns usable
 // metadata: on any structural problem it falls back to the filename title and
