@@ -215,7 +215,8 @@ sequenceDiagram
     Reader->>Calibre: UDP discovery broadcast
     Calibre-->>Reader: discovery response with TCP port
     Reader->>Calibre: TCP connect
-    Calibre<->>Reader: length-prefixed JSON handshake<br/>GET_INITIALIZATION_INFO / GET_DEVICE_INFORMATION / NOOP
+    Calibre->>Reader: length-prefixed JSON handshake request
+    Reader-->>Calibre: GET_INITIALIZATION_INFO / GET_DEVICE_INFORMATION / NOOP responses
 
     UI->>App: SendBooks(book ids)
     App->>Core: load book files + metadata
