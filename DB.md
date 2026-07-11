@@ -34,16 +34,105 @@ so tests behave deterministically.
 One book has many files (formats), many authors (with a role and order), zero
 or one series, and many tags.
 
-```
-author ──┐                          ┌── tag
-         │ book_author              │ book_tag
-         │ (role, position)         │
-         ▼                          ▼
-        book ──────< file           (book ↔ tag many-to-many)
-         │
-         └──> series   (book.series_id, book.series_index)
+```mermaid
+erDiagram
+    AUTHOR ||--o{ BOOK_AUTHOR : contributes
+    BOOK ||--o{ BOOK_AUTHOR : has
+    SERIES ||--o{ BOOK : groups
+    BOOK ||--o{ BOOK_TAG : tagged
+    TAG ||--o{ BOOK_TAG : labels
+    BOOK ||--o{ FILE : contains
+    BOOK ||--o| READING_STATE : tracks
+    BOOK ||--o{ ANNOTATION : has
+    BOOK ||--o| BOOK_FTS : indexes
 
-        book_fts  (FTS5, rowid = book.id)
+    AUTHOR {
+        INTEGER id PK
+        TEXT name UK
+        TEXT sort_name
+    }
+
+    SERIES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT sort_name
+    }
+
+    BOOK {
+        INTEGER id PK
+        TEXT title
+        TEXT title_sort
+        TEXT description
+        TEXT language
+        TEXT isbn
+        TEXT published_at
+        INTEGER series_id FK
+        REAL series_index
+        TEXT added_at
+        TEXT updated_at
+        TEXT cover_path
+        INTEGER remote_path_override_enabled
+        TEXT remote_path_override
+    }
+
+    BOOK_AUTHOR {
+        INTEGER book_id PK FK
+        INTEGER author_id PK FK
+        TEXT role PK
+        INTEGER position
+    }
+
+    TAG {
+        INTEGER id PK
+        TEXT name UK
+    }
+
+    BOOK_TAG {
+        INTEGER book_id PK FK
+        INTEGER tag_id PK FK
+    }
+
+    FILE {
+        INTEGER id PK
+        INTEGER book_id FK
+        TEXT path UK
+        TEXT format
+        INTEGER size
+        TEXT sha256
+        TEXT added_at
+    }
+
+    READING_STATE {
+        INTEGER book_id PK FK
+        REAL percent
+        INTEGER pages
+        TEXT status
+        TEXT device
+        TEXT last_read_at
+        TEXT synced_at
+    }
+
+    ANNOTATION {
+        INTEGER id PK
+        INTEGER book_id FK
+        TEXT text
+        TEXT note
+        TEXT chapter
+        TEXT drawer
+        TEXT created_at
+        TEXT dedup_key UK
+    }
+
+    BOOK_FTS {
+        TEXT title
+        TEXT authors
+        TEXT series
+        TEXT tags
+    }
+
+    SCHEMA_VERSION {
+        INTEGER version
+    }
 ```
 
 ### Tables
@@ -52,7 +141,9 @@ author ──┐                          ┌── tag
   `description`, `language`, `isbn`, `published_at`, `cover_path`), a nullable
   `series_id` (+ `series_index REAL`), and `added_at` / `updated_at` timestamps
   stored as RFC3339 UTC strings. `published_at` is free-form text (ISO 8601 when
-  known) because ebook metadata dates are notoriously irregular.
+  known) because ebook metadata dates are notoriously irregular. `remote_path_override_enabled`
+  and `remote_path_override` store the optional per-book KOReader destination
+  path override added by migration `0002`.
 - **`author`** — unique `name`, plus a `sort_name` ("Last, First") used for
   ordering. When not supplied, `sort_name` is derived from the name.
 - **`series`** — unique `name` + `sort_name`.

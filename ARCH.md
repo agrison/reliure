@@ -31,6 +31,54 @@ internal/
 frontend/       Svelte + Vite UI, embedded into the binary
 ```
 
+## Package interaction map
+
+The app layer wires UI-facing services to framework-agnostic packages. Most
+packages do not know Wails exists; they communicate through plain Go types and
+small interfaces.
+
+```mermaid
+flowchart LR
+    UI["frontend<br/>Svelte + generated bindings"]
+    APP["cmd/app<br/>Wails services"]
+    CORE["internal/core<br/>SQLite, repos, FTS"]
+    FORMATS["internal/formats<br/>registry + thumbnails"]
+    EPUB["internal/formats/epub"]
+    PDF["internal/formats/pdf"]
+    LIB["internal/library<br/>import pipeline"]
+    SETTINGS["internal/settings<br/>JSON preferences"]
+    OPDS["internal/opds<br/>HTTP OPDS catalog"]
+    CALIBRE["internal/calibre<br/>UDP discovery + TCP session"]
+    DEVICE["internal/device<br/>.reliure inventory"]
+    KOREADER["internal/koreader<br/>.sdr progress + annotations"]
+    METADATA["internal/metadata<br/>online metadata providers"]
+    GUTENBERG["internal/gutenberg<br/>public-domain catalog"]
+    HOOKS["internal/hooks<br/>script events"]
+
+    UI --> APP
+    APP --> CORE
+    APP --> LIB
+    APP --> SETTINGS
+    APP --> OPDS
+    APP --> CALIBRE
+    APP --> DEVICE
+    APP --> KOREADER
+    APP --> METADATA
+    APP --> GUTENBERG
+    APP --> FORMATS
+    APP -. blank imports .-> EPUB
+    APP -. blank imports .-> PDF
+
+    LIB --> CORE
+    LIB --> FORMATS
+    LIB --> SETTINGS
+    EPUB --> FORMATS
+    PDF --> FORMATS
+
+    OPDS --> CORE
+    CALIBRE --> CORE
+```
+
 ## Layers
 
 - **`internal/core`** — the heart. Owns the domain models (`Book`, `Author`,
@@ -146,6 +194,63 @@ frontend/       Svelte + Vite UI, embedded into the binary
   device. Reading status/progress can also be set **manually**
   (`LibraryService.SetReadingState`, by percentage or page), so the tracking works
   with no reader connected at all.
+
+## KOReader / Calibre Wireless Protocol
+
+Reliure implements the Calibre "smart device" protocol subset used by KOReader's
+wireless plugin. The protocol gives us two workflows over the same live
+connection: push books to the reader, then later fetch KOReader sidecars to
+mirror reading state.
+
+```mermaid
+sequenceDiagram
+    participant UI as Svelte UI
+    participant App as CalibreService (cmd/app)
+    participant Calibre as internal/calibre
+    participant Device as internal/device
+    participant Reader as KOReader wireless.koplugin
+    participant Core as internal/core
+    participant KR as internal/koreader
+
+    Reader->>Calibre: UDP discovery broadcast
+    Calibre-->>Reader: discovery response with TCP port
+    Reader->>Calibre: TCP connect
+    Calibre<->>Reader: length-prefixed JSON handshake<br/>GET_INITIALIZATION_INFO / GET_DEVICE_INFORMATION / NOOP
+
+    UI->>App: SendBooks(book ids)
+    App->>Core: load book files + metadata
+    App->>Calibre: SEND_BOOK for each selected file
+    Calibre-->>Reader: book bytes + remote lpath
+    App->>Device: update cached inventory
+    App->>Calibre: SEND_BOOK .reliure
+    Calibre-->>Reader: inventory file
+    App-->>UI: progress + result
+
+    UI->>App: Sync reading from connected reader
+    App->>Device: read cached .reliure inventory
+    loop each inventory entry
+        App->>Calibre: GET_BOOK_FILE_SEGMENT lpath + ".sdr/metadata.{ext}.lua"
+        Calibre-->>Reader: request sidecar segment
+        Reader-->>Calibre: sidecar bytes or NOOP if missing
+        App->>KR: parse Lua sidecar as data
+        App->>Core: merge reading_state + annotations
+    end
+    App-->>UI: updated progress and annotations
+```
+
+Important details:
+
+- Discovery is UDP; the session itself is TCP with length-prefixed JSON
+  messages.
+- Reliure implements only the opcodes needed for this workflow:
+  initialization/device-info, keepalive, `SEND_BOOK`, and file segment reads for
+  KOReader sidecars.
+- Remote paths are computed before sending from the global KOReader path
+  template or a per-book override.
+- `.reliure` is sent as an ordinary file through the same `SEND_BOOK` path. It
+  maps each remote `lpath` back to Reliure's local book/file ids.
+- Reading sync is read-only. Reliure fetches `.sdr` sidecars, parses them, and
+  merges progress forward; it never writes reading state back to KOReader.
 
 - **`cmd/app`** — the desktop shell. Creates the Wails application, registers Go
   *services* whose public methods are callable from JS, and opens the main
