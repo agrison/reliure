@@ -28,6 +28,8 @@ export type {
     CoverResult,
     DeviceBookState,
     FileInfo,
+    GutenbergBook,
+    GutenbergResult,
     ImportProgress,
     ImportSummary,
     LibraryStats,

@@ -15,6 +15,7 @@ import (
 	"github.com/agrison/reliure/internal/calibre"
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/device"
+	"github.com/agrison/reliure/internal/gutenberg"
 	"github.com/agrison/reliure/internal/metadata"
 	"github.com/agrison/reliure/internal/opds"
 	"github.com/agrison/reliure/internal/settings"
@@ -53,7 +54,13 @@ func main() {
 	}
 	coverDir := filepath.Join(configDir, "covers")
 
-	libSvc := &LibraryService{db: db, settings: store, coverDir: coverDir, meta: metadata.NewClient()}
+	libSvc := &LibraryService{
+		db:        db,
+		settings:  store,
+		coverDir:  coverDir,
+		meta:      metadata.NewClient(),
+		gutenberg: gutenberg.NewCatalog(filepath.Join(configDir, "gutenberg", "pg_catalog.csv")),
+	}
 	opdsServer := opds.NewServer(opds.NewHandler(opds.HandlerConfig{
 		Catalog:  opds.CoreCatalog{DB: db},
 		CoverDir: coverDir,

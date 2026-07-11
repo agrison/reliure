@@ -59,6 +59,13 @@
     <span>Édition rapide</span>
   </button>
 
+  <button class="root tool" class:active={active.kind === "gutenberg"} onclick={() => onSelect({ kind: "gutenberg" })}>
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+    </svg>
+    <span>Découvrir</span>
+  </button>
+
   <nav class="groups">
     {#each groups as g (g.key)}
       <div class="group">
@@ -322,7 +329,8 @@
     border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
     color: var(--text);
   }
-  .settings svg {
+  .settings svg,
+  .root.tool svg {
     flex: none;
   }
 </style>

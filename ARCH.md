@@ -113,6 +113,16 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `internal/core`), letting the app layer offer a per-field, editable merge to
   the user. `Client.FetchImage` downloads a chosen cover for the app to thumbnail.
 
+- **`internal/gutenberg`** — Project Gutenberg discovery off the official
+  catalogue CSV (~21 MB, ~90k rows), downloaded once and cached under the config
+  dir (refreshed after a month). A `Catalog` parses it into memory and searches
+  there — instant, offline, with real language filtering — deliberately avoiding
+  the Gutendex proxy, whose uncached queries take tens of seconds. Cover and EPUB
+  URLs follow Gutenberg's fixed naming convention (no per-book API call), and
+  `Download` streams the EPUB, trying the URL variants in order. Independent of
+  `internal/core`/`internal/library`; the app layer downloads the EPUB to a temp
+  file and feeds it to the normal import pipeline (forced copy mode).
+
 - **`cmd/app`** — the desktop shell. Creates the Wails application, registers Go
   *services* whose public methods are callable from JS, and opens the main
   window. It stays deliberately thin: it wires `internal/*` to the UI and holds
@@ -129,7 +139,10 @@ frontend/       Svelte + Vite UI, embedded into the binary
   moves, metadata mirroring and validation stay consistent. `SearchOnlineMetadata`
   queries `internal/metadata` for candidate editions and `ApplyOnlineMetadata`
   applies the user's field-by-field choices (again through `UpdateBook`) plus an
-  optional downloaded cover. `SettingsService`
+  optional downloaded cover. `SearchGutenberg`/`ImportGutenbergBook` back the
+  "Découvrir" view: browse Project Gutenberg and add a book's EPUB (downloaded to
+  a temp file, then run through the shared import core in copy mode).
+  `SettingsService`
   reads/writes preferences. `OPDSService` starts, stops and reports the local
   pull catalog URL. `CalibreService` controls the push server, sends books,
   updates/sends `.reliure`, and exposes per-book device presence states to the

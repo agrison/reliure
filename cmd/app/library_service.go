@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/agrison/reliure/internal/core"
+	"github.com/agrison/reliure/internal/gutenberg"
 	"github.com/agrison/reliure/internal/library"
 	"github.com/agrison/reliure/internal/metadata"
 	"github.com/agrison/reliure/internal/settings"
@@ -32,10 +33,11 @@ func init() {
 // of ebooks (with live progress events) and basic stats. It is a thin adapter
 // over internal/library and internal/core.
 type LibraryService struct {
-	db       *core.DB
-	settings *settings.Store
-	coverDir string
-	meta     *metadata.Client
+	db        *core.DB
+	settings  *settings.Store
+	coverDir  string
+	meta      *metadata.Client
+	gutenberg *gutenberg.Catalog
 }
 
 // ImportProgress is the per-file payload sent on the "import:progress" event.
@@ -93,11 +95,18 @@ func (s *LibraryService) ChooseAndImport() (ImportSummary, error) {
 // event per file and an "import:done" event with the summary at the end — the
 // latter lets a drag-and-drop import (which nothing awaits) refresh the view.
 func (s *LibraryService) ImportPaths(paths []string) (ImportSummary, error) {
-	// Build the importer from current settings so a mode/library-dir change
+	// Build the importer from the current mode so a mode/library-dir change
 	// takes effect immediately, without restarting the app.
+	return s.importPathsMode(paths, s.settings.Get().ImportMode)
+}
+
+// importPathsMode is the shared import core with an explicit mode. Callers that
+// download a file into a temp location (e.g. a Gutenberg add) force ModeCopy, so
+// the throwaway source is copied into the library rather than referenced.
+func (s *LibraryService) importPathsMode(paths []string, mode library.Mode) (ImportSummary, error) {
 	cfg := s.settings.Get()
 	imp := library.New(s.db, library.Config{
-		Mode:       cfg.ImportMode,
+		Mode:       mode,
 		LibraryDir: cfg.LibraryDir,
 		CoverDir:   s.coverDir,
 		Merge:      true,

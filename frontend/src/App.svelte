@@ -26,6 +26,7 @@
   import QuickEditTable from "./lib/QuickEditTable.svelte";
   import BookDetailView from "./lib/BookDetail.svelte";
   import MetadataMatch from "./lib/MetadataMatch.svelte";
+  import Discover from "./lib/Discover.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import type { ApplyMetadataInput } from "./lib/api";
 
@@ -127,7 +128,9 @@
     clearSelection();
     if (v.kind === "quickedit") loadQuickEdit();
     else if (v.kind === "settings") loadSettings();
-    else loadBooks();
+    else if (v.kind === "gutenberg") {
+      /* the Discover view loads its own catalogue data */
+    } else loadBooks();
   }
 
   async function loadSettings() {
@@ -511,12 +514,12 @@
           </button>
         {/if}
         <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? "Auteurs" : browseMode === "series" ? "Séries" : "Tags"}</h1>
-        {#if view.kind !== "settings"}
+        {#if view.kind !== "settings" && view.kind !== "gutenberg"}
           <span class="n">{visibleCount}</span>
         {/if}
       </div>
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg"}
         <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path
@@ -552,7 +555,7 @@
         </div>
       {/if}
 
-      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings"}
+      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg"}
         <div class="viewtoggle" role="group" aria-label="Affichage">
           <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
@@ -563,7 +566,7 @@
         </div>
       {/if}
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg"}
         <button class="import" onclick={doImport} disabled={importing}>
           {importing ? "Import…" : "Importer"}
         </button>
@@ -612,6 +615,8 @@
         {:else}
           <p class="state">Chargement…</p>
         {/if}
+      {:else if view.kind === "gutenberg"}
+        <Discover />
       {:else if view.kind === "quickedit"}
         {#if quickLoading}
           <p class="state">Chargement…</p>

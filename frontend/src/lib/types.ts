@@ -3,6 +3,7 @@ export type View =
   | { kind: "all" }
   | { kind: "quickedit" }
   | { kind: "settings" }
+  | { kind: "gutenberg" }
   | { kind: "author"; id: number; name: string }
   | { kind: "series"; id: number; name: string }
   | { kind: "tag"; id: number; name: string };
@@ -15,6 +16,8 @@ export function viewTitle(v: View): string {
       return "Édition rapide";
     case "settings":
       return "Réglages";
+    case "gutenberg":
+      return "Découvrir";
     case "author":
       return v.name;
     case "series":

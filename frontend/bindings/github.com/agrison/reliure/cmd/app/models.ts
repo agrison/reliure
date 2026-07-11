@@ -174,6 +174,31 @@ export interface FileInfo {
 }
 
 /**
+ * GutenbergBook is the JSON-friendly shape of a catalogue entry for the
+ * "Découvrir" view.
+ */
+export interface GutenbergBook {
+    "id": number;
+    "title": string;
+    "authors": string[] | null;
+    "languages": string[] | null;
+    "subjects": string[] | null;
+    "cover": string;
+    "hasEpub": boolean;
+}
+
+/**
+ * GutenbergResult is a page of catalogue results.
+ */
+export interface GutenbergResult {
+    "count": number;
+    "hasNext": boolean;
+    "hasPrevious": boolean;
+    "page": number;
+    "books": GutenbergBook[] | null;
+}
+
+/**
  * ImportProgress is the per-file payload sent on the "import:progress" event.
  */
 export interface ImportProgress {

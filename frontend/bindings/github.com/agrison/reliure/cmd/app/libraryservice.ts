@@ -116,6 +116,17 @@ export function ChooseAndImport(): $CancellablePromise<$models.ImportSummary> {
 }
 
 /**
+ * ImportGutenbergBook downloads a catalogue book's EPUB and imports it into the
+ * library. It re-resolves the download URL from Gutendex by id (rather than
+ * trusting a client-supplied URL) and always copies into the managed library,
+ * since the download lives in a throwaway temp file. Progress and the summary
+ * flow through the normal import events, so the UI refreshes as usual.
+ */
+export function ImportGutenbergBook(id: number): $CancellablePromise<$models.ImportSummary> {
+    return $Call.ByID(1202307301, id);
+}
+
+/**
  * ImportPaths imports a mix of files and directories (directories are scanned
  * recursively) using the current import mode. It emits an "import:progress"
  * event per file and an "import:done" event with the summary at the end — the
@@ -165,6 +176,14 @@ export function SaveQuickEdits(rows: $models.QuickEditRow[] | null): $Cancellabl
  */
 export function Search(query: string): $CancellablePromise<$models.BookCard[] | null> {
     return $Call.ByID(2206755262, query);
+}
+
+/**
+ * SearchGutenberg browses the Project Gutenberg catalogue (via Gutendex).
+ * languages is a comma-separated list of ISO 639-1 codes (e.g. "fr" or "fr,en").
+ */
+export function SearchGutenberg(search: string, languages: string, page: number): $CancellablePromise<$models.GutenbergResult> {
+    return $Call.ByID(3955102823, search, languages, page);
 }
 
 /**
