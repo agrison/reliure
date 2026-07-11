@@ -443,6 +443,72 @@ func (s *LibraryService) UpdateBook(in BookUpdate) (BookDetail, error) {
 	return s.Book(in.ID)
 }
 
+// ReadingUpdate is a manual reading-state edit from the UI. Progress can be given
+// as a percentage or as a page (with an optional total). Clear removes tracking.
+type ReadingUpdate struct {
+	BookID     int64   `json:"bookId"`
+	Status     string  `json:"status"`     // "reading" | "complete" | "abandoned" | ""
+	Percent    float64 `json:"percent"`    // 0..1
+	Page       int     `json:"page"`       // current page (optional)
+	TotalPages int     `json:"totalPages"` // total pages (optional)
+	Clear      bool    `json:"clear"`      // true → "mark as unread" (delete state)
+}
+
+// SetReadingState records a book's reading progress/status set by hand, so the
+// feature works without ever connecting KOReader. It always wins over the stored
+// value (unlike device sync, which only advances); a later KOReader sync will
+// still only move it forward, never backward.
+func (s *LibraryService) SetReadingState(in ReadingUpdate) (BookDetail, error) {
+	if in.Clear {
+		if err := s.db.Reading.DeleteState(in.BookID); err != nil {
+			return BookDetail{}, err
+		}
+		return s.Book(in.BookID)
+	}
+
+	existing, _, err := s.db.Reading.State(in.BookID)
+	if err != nil {
+		return BookDetail{}, err
+	}
+	pages := existing.Pages
+	if in.TotalPages > 0 {
+		pages = in.TotalPages
+	}
+	percent := in.Percent
+	if in.Page > 0 && pages > 0 {
+		percent = float64(in.Page) / float64(pages)
+	}
+	status := strings.TrimSpace(in.Status)
+	if status == "complete" {
+		percent = 1
+	}
+	if status == "" && percent > 0 {
+		status = "reading" // a bare progress value implies "in progress"
+	}
+	percent = clampUnit(percent)
+
+	if err := s.db.Reading.UpsertState(core.ReadingState{
+		BookID:     in.BookID,
+		Percent:    percent,
+		Pages:      pages,
+		Status:     status,
+		LastReadAt: time.Now().UTC().Format("2006-01-02"),
+	}); err != nil {
+		return BookDetail{}, err
+	}
+	return s.Book(in.BookID)
+}
+
+func clampUnit(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
 // SetTitleSort updates just a book's sort title (empty clears it) and, if
 // enabled, mirrors it into the ebook file.
 func (s *LibraryService) SetTitleSort(bookID int64, sort string) (BookDetail, error) {

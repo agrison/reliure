@@ -229,6 +229,16 @@ export function SetAuthorSort(bookID: number, authorID: number, sort: string): $
 }
 
 /**
+ * SetReadingState records a book's reading progress/status set by hand, so the
+ * feature works without ever connecting KOReader. It always wins over the stored
+ * value (unlike device sync, which only advances); a later KOReader sync will
+ * still only move it forward, never backward.
+ */
+export function SetReadingState($in: $models.ReadingUpdate): $CancellablePromise<$models.BookDetail> {
+    return $Call.ByID(1332077319, $in);
+}
+
+/**
  * SetTitleSort updates just a book's sort title (empty clears it) and, if
  * enabled, mirrors it into the ebook file.
  */

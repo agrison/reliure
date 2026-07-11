@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { BookDetail, BookUpdate } from "./api";
+  import type { BookDetail, BookUpdate, ReadingUpdate } from "./api";
 
   let {
     book,
@@ -9,6 +9,7 @@
     onSetTitleSort,
     onSetAuthorSort,
     onFetchOnline,
+    onSetReading,
   }: {
     book: BookDetail;
     onClose: () => void;
@@ -17,7 +18,55 @@
     onSetTitleSort: (sort: string) => Promise<void> | void;
     onSetAuthorSort: (authorId: number, sort: string) => Promise<void> | void;
     onFetchOnline: () => void;
+    onSetReading: (update: ReadingUpdate) => Promise<void> | void;
   } = $props();
+
+  // Manual reading tracking (works with or without KOReader). Inputs are seeded
+  // from the book and only re-seed when the book changes (after a save), so
+  // typing is never interrupted.
+  let pctInput = $state("");
+  let pageInput = $state("");
+  let totalInput = $state("");
+  $effect(() => {
+    book.id; // re-seed when a different/updated book arrives
+    pctInput = book.percent > 0 ? String(Math.round(book.percent * 100)) : "";
+    totalInput = book.pages > 0 ? String(book.pages) : "";
+    pageInput = book.pages > 0 && book.percent > 0 ? String(Math.max(1, Math.round(book.percent * book.pages))) : "";
+  });
+
+  function sendReading(p: Partial<ReadingUpdate>) {
+    onSetReading({ bookId: book.id, status: "", percent: 0, page: 0, totalPages: 0, clear: false, ...p });
+  }
+  function setReadingStatus(status: string) {
+    if (status === "") return sendReading({ clear: true });
+    sendReading({ status, percent: book.percent, totalPages: book.pages });
+  }
+  // Editing raw progress keeps a deliberate "abandoned", otherwise means "reading".
+  function statusForProgress(): string {
+    return book.readingStatus === "abandoned" ? "abandoned" : "reading";
+  }
+  function parseNum(s: string): number | null {
+    const t = s.trim();
+    if (t === "") return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+  function commitPercent() {
+    const n = parseNum(pctInput);
+    if (n === null) return;
+    const percent = Math.min(1, Math.max(0, n / 100));
+    if (Math.abs(percent - book.percent) < 0.001 && book.readingStatus) return;
+    sendReading({ status: statusForProgress(), percent, totalPages: parseNum(totalInput) ?? book.pages });
+  }
+  function commitPage() {
+    const page = parseNum(pageInput);
+    const total = parseNum(totalInput) ?? book.pages;
+    if (page === null || total <= 0) return;
+    sendReading({ status: statusForProgress(), page: Math.round(page), totalPages: Math.round(total) });
+  }
+  function enterBlur(e: KeyboardEvent) {
+    if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+  }
 
   function commitTitleSort(value: string) {
     if (value.trim() !== (book.titleSort ?? "")) onSetTitleSort(value.trim());
@@ -78,9 +127,6 @@
 
   const roleLabels: Record<string, string> = {
     aut: "", trl: "trad.", edt: "éd.", ill: "ill.", ctb: "contrib.",
-  };
-  const statusLabels: Record<string, string> = {
-    reading: "En cours", complete: "Terminé", abandoned: "Abandonné", new: "À lire",
   };
 
   $effect(() => {
@@ -304,20 +350,38 @@
     {/each}
   </div>
 
-  {#if book.percent > 0 || book.readingStatus || book.annotations?.length}
-    <div class="meta">
+  <div class="meta">
       <h3>Lecture</h3>
+      <div class="statuschips">
+        <button class:on={!book.readingStatus} onclick={() => setReadingStatus("")}>Non lu</button>
+        <button class:on={book.readingStatus === "reading"} onclick={() => setReadingStatus("reading")}>En cours</button>
+        <button class:on={book.readingStatus === "complete"} onclick={() => setReadingStatus("complete")}>Terminé</button>
+        <button class:on={book.readingStatus === "abandoned"} onclick={() => setReadingStatus("abandoned")}>Abandonné</button>
+      </div>
+
       {#if book.readingStatus || book.percent > 0}
         <div class="readbar">
           <div class="rtrack"><div class="rfill" class:done={book.readingStatus === "complete"} style="width:{Math.round((book.readingStatus === 'complete' ? 1 : book.percent) * 100)}%"></div></div>
           <span class="rpct">{book.readingStatus === "complete" ? "Terminé" : Math.round(book.percent * 100) + " %"}</span>
         </div>
+      {/if}
+
+      <div class="progressedit">
+        <input class="peinput" bind:value={pctInput} inputmode="numeric" aria-label="Pourcentage lu" placeholder="0" onblur={commitPercent} onkeydown={enterBlur} /><span class="peunit">%</span>
+        <span class="pesep">ou</span>
+        <span class="pelabel">page</span>
+        <input class="peinput" bind:value={pageInput} inputmode="numeric" aria-label="Page actuelle" placeholder="—" onblur={commitPage} onkeydown={enterBlur} />
+        <span class="peunit">/</span>
+        <input class="peinput" bind:value={totalInput} inputmode="numeric" aria-label="Nombre de pages" placeholder="total" onblur={commitPage} onkeydown={enterBlur} />
+      </div>
+
+      {#if book.pages > 0 || book.lastReadAt}
         <div class="readmeta">
-          {#if book.readingStatus}<span class="rstatus">{statusLabels[book.readingStatus] ?? book.readingStatus}</span>{/if}
-          {#if book.pages > 0}<span>page {Math.max(1, Math.round((book.readingStatus === "complete" ? 1 : book.percent) * book.pages))} / {book.pages}</span>{/if}
+          {#if book.pages > 0 && book.readingStatus !== "complete" && book.percent > 0}<span>page {Math.max(1, Math.round(book.percent * book.pages))} / {book.pages}</span>{/if}
           {#if book.lastReadAt}<span>Dernière lecture : {book.lastReadAt}</span>{/if}
         </div>
       {/if}
+
       {#if book.annotations?.length}
         <div class="annos">
           <div class="annohead">{book.annotations.length} surlignage{book.annotations.length === 1 ? "" : "s"} / note{book.annotations.length === 1 ? "" : "s"}</div>
@@ -332,7 +396,6 @@
         </div>
       {/if}
     </div>
-  {/if}
 
   {#if book.remotePath}
     <div class="meta">
@@ -772,10 +835,64 @@
     user-select: text;
   }
 
+  .statuschips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.7rem;
+  }
+  .statuschips button {
+    padding: 0.32rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+  }
+  .statuschips button:hover {
+    color: var(--text);
+    background: var(--surface-hi);
+  }
+  .statuschips button.on {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    color: var(--text);
+    font-weight: 600;
+  }
+  .progressedit {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+    font-size: 0.78rem;
+    color: var(--faint);
+  }
+  .peinput {
+    width: 3.2rem;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8rem;
+    text-align: center;
+    outline: none;
+  }
+  .peinput:focus {
+    border-color: var(--border-hi);
+    background: var(--surface-hi);
+  }
+  .pesep {
+    margin: 0 0.25rem;
+  }
   .readbar {
     display: flex;
     align-items: center;
     gap: 0.7rem;
+    margin-top: 0.2rem;
   }
   .rtrack {
     flex: 1;
@@ -805,10 +922,6 @@
     margin-top: 0.5rem;
     font-size: 0.76rem;
     color: var(--faint);
-  }
-  .rstatus {
-    color: var(--accent);
-    font-weight: 600;
   }
   .annos {
     margin-top: 1rem;

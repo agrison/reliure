@@ -48,6 +48,7 @@ export type {
     QuickEditSavedBook,
     ReadingCard,
     ReadingStatusCounts,
+    ReadingUpdate,
     RemoveBookResult,
     SendResult,
     SidebarItem

@@ -66,6 +66,59 @@ func TestStatusCountsAndListByStatus(t *testing.T) {
 	}
 }
 
+func TestMergeDeviceStateOneDirectional(t *testing.T) {
+	db := newTestDB(t)
+	id := readingTestBook(t, db)
+
+	// Empty → device state is taken.
+	if err := db.Reading.MergeDeviceState(ReadingState{BookID: id, Percent: 0.3, Pages: 300, Status: "reading"}); err != nil {
+		t.Fatal(err)
+	}
+	st, _, _ := db.Reading.State(id)
+	if st.Percent != 0.3 {
+		t.Fatalf("percent = %v, want 0.3", st.Percent)
+	}
+
+	// A more advanced device state moves it forward.
+	_ = db.Reading.MergeDeviceState(ReadingState{BookID: id, Percent: 0.7, Status: "reading"})
+	if st, _, _ = db.Reading.State(id); st.Percent != 0.7 {
+		t.Errorf("percent = %v, want 0.7 (advanced)", st.Percent)
+	}
+
+	// A LOWER device state must NOT roll it back.
+	_ = db.Reading.MergeDeviceState(ReadingState{BookID: id, Percent: 0.2, Status: "reading"})
+	if st, _, _ = db.Reading.State(id); st.Percent != 0.7 {
+		t.Errorf("percent = %v, want 0.7 (no rollback)", st.Percent)
+	}
+
+	// A manual "complete" outranks any partial device percentage.
+	_ = db.Reading.UpsertState(ReadingState{BookID: id, Percent: 1, Status: "complete"})
+	_ = db.Reading.MergeDeviceState(ReadingState{BookID: id, Percent: 0.9, Status: "reading"})
+	if st, _, _ = db.Reading.State(id); st.Status != "complete" {
+		t.Errorf("status = %q, want complete (device 90%% must not downgrade)", st.Status)
+	}
+
+	// Even when not more advanced, the device teaches the page count if missing.
+	other := readingTestBook(t, db)
+	_ = db.Reading.UpsertState(ReadingState{BookID: other, Percent: 0.5, Status: "reading"}) // pages 0
+	_ = db.Reading.MergeDeviceState(ReadingState{BookID: other, Percent: 0.4, Pages: 250, Status: "reading"})
+	if st, _, _ = db.Reading.State(other); st.Pages != 250 || st.Percent != 0.5 {
+		t.Errorf("state = %+v, want pages 250 kept percent 0.5", st)
+	}
+}
+
+func TestDeleteState(t *testing.T) {
+	db := newTestDB(t)
+	id := readingTestBook(t, db)
+	_ = db.Reading.UpsertState(ReadingState{BookID: id, Percent: 0.5, Status: "reading"})
+	if err := db.Reading.DeleteState(id); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := db.Reading.State(id); ok {
+		t.Error("state should be gone after DeleteState")
+	}
+}
+
 func TestReplaceAnnotationsIdempotent(t *testing.T) {
 	db := newTestDB(t)
 	id := readingTestBook(t, db)

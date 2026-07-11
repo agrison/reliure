@@ -395,6 +395,39 @@ export interface ReadingStatusCounts {
 }
 
 /**
+ * ReadingUpdate is a manual reading-state edit from the UI. Progress can be given
+ * as a percentage or as a page (with an optional total). Clear removes tracking.
+ */
+export interface ReadingUpdate {
+    "bookId": number;
+
+    /**
+     * "reading" | "complete" | "abandoned" | ""
+     */
+    "status": string;
+
+    /**
+     * 0..1
+     */
+    "percent": number;
+
+    /**
+     * current page (optional)
+     */
+    "page": number;
+
+    /**
+     * total pages (optional)
+     */
+    "totalPages": number;
+
+    /**
+     * true → "mark as unread" (delete state)
+     */
+    "clear": boolean;
+}
+
+/**
  * RemoveBookResult describes how a removed book was handled.
  */
 export interface RemoveBookResult {

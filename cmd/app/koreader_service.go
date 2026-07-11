@@ -216,7 +216,7 @@ func (s *KOReaderService) sync(dir string) (KoreaderSyncResult, error) {
 	res.Matched = len(byBook)
 
 	for bookID, a := range byBook {
-		if err := s.db.Reading.UpsertState(core.ReadingState{
+		if err := s.db.Reading.MergeDeviceState(core.ReadingState{
 			BookID: bookID, Percent: a.percent, Pages: a.pages, Status: a.status, LastReadAt: a.modified,
 		}); err != nil {
 			return res, err

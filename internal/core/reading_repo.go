@@ -51,6 +51,46 @@ func (r *ReadingRepo) UpsertState(s ReadingState) error {
 	return err
 }
 
+// MergeDeviceState applies a state read from a KOReader device, keeping whichever
+// is FURTHER ALONG. This makes device sync one-directional: KOReader can only
+// advance Reliure's progress, never roll back a status the user set by hand (or a
+// higher progress from another device). Annotations are handled separately and
+// always taken from the device.
+func (r *ReadingRepo) MergeDeviceState(s ReadingState) error {
+	existing, ok, err := r.State(s.BookID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return r.UpsertState(s) // nothing recorded yet
+	}
+	if effectivePercent(s) > effectivePercent(existing) {
+		return r.UpsertState(s) // the device is further along
+	}
+	// Reliure is at least as advanced: keep it, but learn the page count if the
+	// device knows it and we didn't.
+	if existing.Pages == 0 && s.Pages > 0 {
+		existing.Pages = s.Pages
+		return r.UpsertState(existing)
+	}
+	return nil
+}
+
+// DeleteState removes a book's reading state (used by "mark as unread").
+func (r *ReadingRepo) DeleteState(bookID int64) error {
+	_, err := r.db.Exec(`DELETE FROM reading_state WHERE book_id = ?`, bookID)
+	return err
+}
+
+// effectivePercent treats a completed book as fully read whatever its stored
+// percentage, so "complete" always outranks a partial percentage.
+func effectivePercent(s ReadingState) float64 {
+	if s.Status == "complete" {
+		return 1
+	}
+	return s.Percent
+}
+
 // State returns a book's reading state, if any.
 func (r *ReadingRepo) State(bookID int64) (ReadingState, bool, error) {
 	row := r.db.QueryRow(`

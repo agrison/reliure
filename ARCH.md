@@ -140,6 +140,12 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `CalibreService.SyncReadingFromDevice` walks the `.reliure` inventory (which
   maps each `lpath` → book id, giving exact matching), fetches each sidecar and
   stores progress + annotations. Missing files reply NOOP, so it never blocks.
+  Device sync is **one-directional**: `ReadingRepo.MergeDeviceState` only advances
+  Reliure's progress (comparing an effective percent where "complete" = 1), never
+  rolls back a status the user set by hand — and Reliure never writes to the
+  device. Reading status/progress can also be set **manually**
+  (`LibraryService.SetReadingState`, by percentage or page), so the tracking works
+  with no reader connected at all.
 
 - **`cmd/app`** — the desktop shell. Creates the Wails application, registers Go
   *services* whose public methods are callable from JS, and opens the main

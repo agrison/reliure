@@ -278,7 +278,7 @@ func (s *CalibreService) fetchSidecar(sess *calibre.Session, e device.Entry) ([]
 }
 
 func (s *CalibreService) applyDeviceReading(bookID int64, deviceName string, sc *koreader.Sidecar, res *KoreaderSyncResult) error {
-	if err := s.db.Reading.UpsertState(core.ReadingState{
+	if err := s.db.Reading.MergeDeviceState(core.ReadingState{
 		BookID:     bookID,
 		Percent:    sc.PercentFinished,
 		Pages:      sc.TotalPages,

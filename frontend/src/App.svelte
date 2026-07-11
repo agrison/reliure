@@ -33,7 +33,7 @@
   import Discover from "./lib/Discover.svelte";
   import Annotations from "./lib/Annotations.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
-  import type { ApplyMetadataInput } from "./lib/api";
+  import type { ApplyMetadataInput, ReadingUpdate } from "./lib/api";
 
   let view = $state<View>({ kind: "all" });
   let browseMode = $state<"books" | "author" | "series" | "tag">("books");
@@ -365,6 +365,17 @@
     try {
       detail = await LibraryService.SetAuthorSort(detail.id, authorId, sort);
       await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
+
+  async function setReading(update: ReadingUpdate) {
+    if (!detail) return;
+    try {
+      detail = await LibraryService.SetReadingState(update);
+      await Promise.all([loadReadingStates(), loadBooks()]);
     } catch (e) {
       toast = `Enregistrement impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -774,6 +785,7 @@
     onSetTitleSort={setTitleSort}
     onSetAuthorSort={setAuthorSort}
     onFetchOnline={() => (matching = true)}
+    onSetReading={setReading}
   />
 {/if}
 
