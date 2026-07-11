@@ -659,7 +659,14 @@ func coverURL(b *core.Book) string {
 	if b.CoverPath == "" {
 		return ""
 	}
-	return coverURLPrefix + b.CoverPath
+	// Cache-bust with the book's last-modified time: a replaced cover keeps the
+	// same "<id>.jpg" filename, so without this the webview would show the old
+	// image from cache (e.g. after applying an online cover or regenerating).
+	url := coverURLPrefix + b.CoverPath
+	if !b.UpdatedAt.IsZero() {
+		url += "?v=" + strconv.FormatInt(b.UpdatedAt.Unix(), 10)
+	}
+	return url
 }
 
 func seriesName(b *core.Book) string {

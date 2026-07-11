@@ -15,6 +15,7 @@ import (
 	"github.com/agrison/reliure/internal/calibre"
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/device"
+	"github.com/agrison/reliure/internal/metadata"
 	"github.com/agrison/reliure/internal/opds"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -52,7 +53,7 @@ func main() {
 	}
 	coverDir := filepath.Join(configDir, "covers")
 
-	libSvc := &LibraryService{db: db, settings: store, coverDir: coverDir}
+	libSvc := &LibraryService{db: db, settings: store, coverDir: coverDir, meta: metadata.NewClient()}
 	opdsServer := opds.NewServer(opds.NewHandler(opds.HandlerConfig{
 		Catalog:  opds.CoreCatalog{DB: db},
 		CoverDir: coverDir,

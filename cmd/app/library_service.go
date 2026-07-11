@@ -9,6 +9,7 @@ import (
 
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/library"
+	"github.com/agrison/reliure/internal/metadata"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -34,6 +35,7 @@ type LibraryService struct {
 	db       *core.DB
 	settings *settings.Store
 	coverDir string
+	meta     *metadata.Client
 }
 
 // ImportProgress is the per-file payload sent on the "import:progress" event.

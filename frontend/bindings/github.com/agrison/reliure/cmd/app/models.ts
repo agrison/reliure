@@ -18,6 +18,15 @@ export interface AppSettings {
 }
 
 /**
+ * ApplyMetadataInput carries the user's field-by-field choices as a ready-made
+ * BookUpdate, plus an optional cover URL to download and apply.
+ */
+export interface ApplyMetadataInput {
+    "book": BookUpdate;
+    "coverUrl": string;
+}
+
+/**
  * BatchSeriesUpdate assigns one series to several books. When SeriesIndexStart
  * is set, books receive consecutive indices in the order provided by IDs.
  */
@@ -203,6 +212,39 @@ export interface OPDSStatus {
     "port": number;
     "url": string;
     "error"?: string;
+}
+
+/**
+ * OnlineCandidate is one online edition offered to the user, JSON-friendly. It
+ * carries every field so the frontend can let the user cherry-pick and edit
+ * each one before applying (e.g. keep the French description, drop an author in
+ * "Last, First" form).
+ */
+export interface OnlineCandidate {
+    "id": string;
+    "source": string;
+    "title": string;
+    "subtitle": string;
+    "authors": string[] | null;
+    "publisher": string;
+    "published": string;
+    "description": string;
+    "language": string;
+    "isbn": string;
+    "series": string;
+    "seriesIndex": string;
+    "tags": string[] | null;
+    "coverUrl": string;
+    "pageCount": number;
+}
+
+/**
+ * OnlineSearchResult wraps the ranked candidates plus the effective query, so
+ * the UI can show what it actually searched for.
+ */
+export interface OnlineSearchResult {
+    "query": string;
+    "candidates": OnlineCandidate[] | null;
 }
 
 /**

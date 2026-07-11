@@ -17,6 +17,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * ApplyOnlineMetadata persists the user's chosen fields (already merged into a
+ * BookUpdate by the frontend) and, if a cover URL was chosen, downloads and
+ * installs that cover. Cover failure is non-fatal: the metadata is the point,
+ * so it is logged and the (metadata-updated) detail is still returned.
+ */
+export function ApplyOnlineMetadata($in: $models.ApplyMetadataInput): $CancellablePromise<$models.BookDetail> {
+    return $Call.ByID(347221400, $in);
+}
+
+/**
  * AuthorGroups returns author tiles for the grouped library view, including a
  * synthetic fallback tile for books without authors.
  */
@@ -155,6 +165,16 @@ export function SaveQuickEdits(rows: $models.QuickEditRow[] | null): $Cancellabl
  */
 export function Search(query: string): $CancellablePromise<$models.BookCard[] | null> {
     return $Call.ByID(2206755262, query);
+}
+
+/**
+ * SearchOnlineMetadata queries the online providers for editions matching the
+ * given hints. Empty hints fall back to the book's own metadata, so the UI can
+ * open and search immediately. The language hint only ranks results (preferred
+ * language first); it never hides other editions, so the user keeps the choice.
+ */
+export function SearchOnlineMetadata(bookID: number, title: string, authors: string, isbn: string, language: string): $CancellablePromise<$models.OnlineSearchResult> {
+    return $Call.ByID(3651181984, bookID, title, authors, isbn, language);
 }
 
 /**

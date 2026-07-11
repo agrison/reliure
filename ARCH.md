@@ -100,6 +100,19 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `.reliure` are intentionally left isolated for a later protocol extension if
   KOReader exposes a reliable file-read path.
 
+- **`internal/metadata`** — online metadata enrichment. A `Provider` interface
+  with three key-less implementations: Google Books (rich: descriptions,
+  categories, covers), OpenLibrary (editions — an ISBN query uses the
+  edition-precise `api/books` endpoint so the cover/ISBN match the exact edition,
+  a title query uses fuzzy `search.json`), and the BnF SRU catalogue (French
+  authority: correct French titles/publishers/language, no cover/ISBN). A
+  `Client` fans a query out to all providers concurrently (with a descriptive
+  User-Agent), merges duplicate editions (by ISBN-13 or title+author+language)
+  and ranks them so the caller's preferred language surfaces first without hiding
+  other editions. Results are neutral `Candidate`s (it does not import
+  `internal/core`), letting the app layer offer a per-field, editable merge to
+  the user. `Client.FetchImage` downloads a chosen cover for the app to thumbnail.
+
 - **`cmd/app`** — the desktop shell. Creates the Wails application, registers Go
   *services* whose public methods are callable from JS, and opens the main
   window. It stays deliberately thin: it wires `internal/*` to the UI and holds
@@ -113,7 +126,10 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `Authors`/`SeriesList`/`Tags` feed the sidebar with counts, `Book` returns the
   detail. `QuickEditRows`/`SaveQuickEdits` power the spreadsheet-like bulk
   metadata editor and deliberately reuse the normal `UpdateBook` path, so file
-  moves, metadata mirroring and validation stay consistent. `SettingsService`
+  moves, metadata mirroring and validation stay consistent. `SearchOnlineMetadata`
+  queries `internal/metadata` for candidate editions and `ApplyOnlineMetadata`
+  applies the user's field-by-field choices (again through `UpdateBook`) plus an
+  optional downloaded cover. `SettingsService`
   reads/writes preferences. `OPDSService` starts, stops and reports the local
   pull catalog URL. `CalibreService` controls the push server, sends books,
   updates/sends `.reliure`, and exposes per-book device presence states to the

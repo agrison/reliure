@@ -25,7 +25,9 @@
   import GroupGrid from "./lib/GroupGrid.svelte";
   import QuickEditTable from "./lib/QuickEditTable.svelte";
   import BookDetailView from "./lib/BookDetail.svelte";
+  import MetadataMatch from "./lib/MetadataMatch.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
+  import type { ApplyMetadataInput } from "./lib/api";
 
   let view = $state<View>({ kind: "all" });
   let browseMode = $state<"books" | "author" | "series" | "tag">("books");
@@ -51,6 +53,7 @@
   let tagGroups = $state<SidebarItem[]>([]);
 
   let detail = $state<BookDetail | null>(null);
+  let matching = $state(false);
   let settings = $state<AppSettings | null>(null);
   let opdsStatus = $state<OPDSStatus | null>(null);
   let calibre = $state<CalibreStatus | null>(null);
@@ -262,6 +265,21 @@
     } catch (e) {
       toast = `Enregistrement impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
+    }
+  }
+
+  async function applyOnlineMetadata(input: ApplyMetadataInput) {
+    try {
+      detail = await LibraryService.ApplyOnlineMetadata(input);
+      matching = false;
+      toast = "Métadonnées en ligne appliquées";
+      setTimeout(() => (toast = ""), 4000);
+      await Promise.all([loadSidebar(), loadBooks()]);
+    } catch (e) {
+      console.error("[Reliure] ApplyOnlineMetadata failed", e);
+      toast = `Application impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+      throw e;
     }
   }
 
@@ -641,6 +659,15 @@
     onSave={saveBook}
     onSetTitleSort={setTitleSort}
     onSetAuthorSort={setAuthorSort}
+    onFetchOnline={() => (matching = true)}
+  />
+{/if}
+
+{#if matching && detail}
+  <MetadataMatch
+    book={detail}
+    onClose={() => (matching = false)}
+    onApply={applyOnlineMetadata}
   />
 {/if}
 

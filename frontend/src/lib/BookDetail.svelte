@@ -8,6 +8,7 @@
     onSave,
     onSetTitleSort,
     onSetAuthorSort,
+    onFetchOnline,
   }: {
     book: BookDetail;
     onClose: () => void;
@@ -15,6 +16,7 @@
     onSave: (update: BookUpdate) => Promise<void> | void;
     onSetTitleSort: (sort: string) => Promise<void> | void;
     onSetAuthorSort: (authorId: number, sort: string) => Promise<void> | void;
+    onFetchOnline: () => void;
   } = $props();
 
   function commitTitleSort(value: string) {
@@ -159,6 +161,16 @@
         <div class="ph" style="--h:{hue(book.title)}">{initials(book.title)}</div>
       {/if}
     </div>
+  </div>
+
+  <div class="onlinebar">
+    <button class="online" onclick={onFetchOnline}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7" />
+        <path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18" fill="none" stroke="currentColor" stroke-width="1.7" />
+      </svg>
+      Métadonnées en ligne
+    </button>
   </div>
 
   {#if editing}
@@ -391,8 +403,33 @@
   .hero {
     display: flex;
     justify-content: center;
-    margin: 0.5rem 0 1.5rem;
+    margin: 0.5rem 0 1rem;
   }
+  .onlinebar {
+    display: flex;
+    justify-content: center;
+    margin: 0 0 1.4rem;
+  }
+  .online {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 550;
+    cursor: pointer;
+  }
+  .online:hover {
+    color: var(--accent);
+    background: var(--surface-hi);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+  .online svg { color: var(--accent); }
   .cover {
     width: 190px;
     aspect-ratio: 2 / 3;

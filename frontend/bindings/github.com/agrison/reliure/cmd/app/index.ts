@@ -16,6 +16,7 @@ export {
 
 export type {
     AppSettings,
+    ApplyMetadataInput,
     BatchSeriesUpdate,
     BatchUpdateResult,
     BookCard,
@@ -31,6 +32,8 @@ export type {
     ImportSummary,
     LibraryStats,
     OPDSStatus,
+    OnlineCandidate,
+    OnlineSearchResult,
     PingResult,
     QuickEditRow,
     QuickEditRowError,
