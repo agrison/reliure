@@ -148,6 +148,12 @@ flowchart LR
   `.reliure` are intentionally left isolated for a later protocol extension if
   KOReader exposes a reliable file-read path.
 
+- **Smart shelves** — persisted in `smart_shelf` as rule JSON, not as
+  materialised book lists. `LibraryService` evaluates them against hydrated
+  books, reading states and, when a reader is connected, the cached `.reliure`
+  inventory. Membership therefore updates automatically after metadata edits,
+  reading syncs and sends to the reader.
+
 - **`internal/metadata`** — online metadata enrichment. A `Provider` interface
   with three key-less implementations: Google Books (rich: descriptions,
   categories, covers), OpenLibrary (editions — an ISBN query uses the

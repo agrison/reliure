@@ -32,6 +32,20 @@ export function Get(): $CancellablePromise<$models.AppSettings> {
 }
 
 /**
+ * SetFeatureDiscover toggles the Project Gutenberg discovery view.
+ */
+export function SetFeatureDiscover(enabled: boolean): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(1195094629, enabled);
+}
+
+/**
+ * SetFeatureSmartShelves toggles rule-based smart shelves.
+ */
+export function SetFeatureSmartShelves(enabled: boolean): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(1653019909, enabled);
+}
+
+/**
  * SetImportMode switches between "copy" and "reference". An unknown value is
  * normalized to "copy" by the store.
  */

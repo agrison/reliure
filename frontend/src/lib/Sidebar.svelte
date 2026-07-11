@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SidebarItem, OPDSStatus, CalibreStatus, ReadingStatusCounts } from "./api";
+  import type { SidebarItem, OPDSStatus, CalibreStatus, ReadingStatusCounts, SmartShelfSummary } from "./api";
   import type { View, ReadingStatus } from "./types";
 
   let {
@@ -7,10 +7,13 @@
     authors,
     series,
     tags,
+    shelves,
     opds,
     calibre,
     reading,
     annotationCount,
+    showDiscover,
+    showSmartShelves,
     active,
     onSelect,
     onOpenSettings,
@@ -19,10 +22,13 @@
     authors: SidebarItem[];
     series: SidebarItem[];
     tags: SidebarItem[];
+    shelves: SmartShelfSummary[];
     opds: OPDSStatus | null;
     calibre: CalibreStatus | null;
     reading: ReadingStatusCounts | null;
     annotationCount: number;
+    showDiscover: boolean;
+    showSmartShelves: boolean;
     active: View;
     onSelect: (v: View) => void;
     onOpenSettings: () => void;
@@ -98,12 +104,42 @@
     <span>Édition rapide</span>
   </button>
 
-  <button class="root tool" class:active={active.kind === "gutenberg"} onclick={() => onSelect({ kind: "gutenberg" })}>
-    <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
-      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-    </svg>
-    <span>Découvrir</span>
-  </button>
+  {#if showSmartShelves}
+    <button class="root tool" class:active={active.kind === "shelves"} onclick={() => onSelect({ kind: "shelves" })}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
+        <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M7 4v16M17 4v16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
+      </svg>
+      <span>Étagères</span>
+      <span class="count">{shelves.length}</span>
+    </button>
+  {/if}
+
+  {#if showSmartShelves && shelves.length}
+    <div class="statusrow shelves">
+      {#each shelves as shelf (shelf.id)}
+        <button
+          class="status"
+          class:active={active.kind === "shelf" && active.id === shelf.id}
+          onclick={() => onSelect({ kind: "shelf", id: shelf.id, name: shelf.name })}
+          title={shelf.name}
+        >
+          <span class="dot shelf"></span>
+          <span class="ellipsis">{shelf.name}</span>
+          <span class="count">{shelf.count}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  {#if showDiscover}
+    <button class="root tool" class:active={active.kind === "gutenberg"} onclick={() => onSelect({ kind: "gutenberg" })}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+      </svg>
+      <span>Découvrir</span>
+    </button>
+  {/if}
 
   {#if annotationCount > 0}
     <button class="root tool" class:active={active.kind === "annotations"} onclick={() => onSelect({ kind: "annotations" })}>
@@ -300,6 +336,12 @@
   }
   .status .dot.abandoned {
     background: var(--faint);
+  }
+  .status .dot.shelf {
+    background: color-mix(in srgb, var(--accent) 55%, var(--ok));
+  }
+  .statusrow.shelves {
+    margin-top: -0.25rem;
   }
 
   .groups {

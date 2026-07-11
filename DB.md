@@ -133,6 +133,16 @@ erDiagram
     SCHEMA_VERSION {
         INTEGER version
     }
+
+    SMART_SHELF {
+        INTEGER id PK
+        TEXT name
+        TEXT match
+        TEXT rules_json
+        INTEGER position
+        TEXT created_at
+        TEXT updated_at
+    }
 ```
 
 Mermaid's GitHub renderer accepts one key marker per attribute, so composite
@@ -171,6 +181,10 @@ show the foreign-key links.
   and a `dedup_key` with `UNIQUE (book_id, dedup_key)` so a re-sync is
   idempotent. Indexed by `book_id`. Added in migration `0003`.
 - **`schema_version`** — bookkeeping for the migration runner (see below).
+- **`smart_shelf`** — dynamic shelf definitions. `match` is `all` or `any`;
+  `rules_json` stores the ordered rule list as JSON. Membership is evaluated at
+  read time by the app layer, because some predicates depend on connected-reader
+  state (`on_device`). Added in migration `0005`.
 
 Deleting a book cascades to `book_author`, `book_tag`, `file`, `reading_state`
 and `annotation` (via `ON DELETE CASCADE`); its `book_fts` row is removed

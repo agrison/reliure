@@ -79,6 +79,33 @@ func TestUpdateEmptyDirFallsBack(t *testing.T) {
 	}
 }
 
+func TestFeatureTogglesDefaultVisibleButCanBeDisabled(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	os.WriteFile(path, []byte(`{"importMode":"copy","libraryDir":"/lib"}`), 0o644)
+
+	s, err := Open(path, "/fallback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.Get()
+	if !got.FeatureDiscover || !got.FeatureSmartShelves {
+		t.Fatalf("missing feature fields should default visible: %+v", got)
+	}
+	got.FeatureDiscover = false
+	got.FeatureSmartShelves = false
+	if _, err := s.Update(got); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := Open(path, "/fallback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = s2.Get()
+	if got.FeatureDiscover || got.FeatureSmartShelves {
+		t.Fatalf("disabled feature toggles should persist: %+v", got)
+	}
+}
+
 func TestOpenRejectsCorruptJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	os.WriteFile(path, []byte("{not json"), 0o644)

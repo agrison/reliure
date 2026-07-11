@@ -86,6 +86,13 @@ export function BooksBySeries(id: number): $CancellablePromise<$models.BookCard[
 }
 
 /**
+ * BooksBySmartShelf returns the books currently matching a shelf definition.
+ */
+export function BooksBySmartShelf(id: number): $CancellablePromise<$models.BookCard[] | null> {
+    return $Call.ByID(3225881722, id);
+}
+
+/**
  * BooksByTag returns the books carrying a tag.
  */
 export function BooksByTag(id: number): $CancellablePromise<$models.BookCard[] | null> {
@@ -121,6 +128,13 @@ export function BooksWithoutTag(): $CancellablePromise<$models.BookCard[] | null
  */
 export function ChooseAndImport(): $CancellablePromise<$models.ImportSummary> {
     return $Call.ByID(1506731901);
+}
+
+/**
+ * DeleteSmartShelf removes a shelf definition.
+ */
+export function DeleteSmartShelf(id: number): $CancellablePromise<void> {
+    return $Call.ByID(386768558, id);
 }
 
 /**
@@ -177,6 +191,13 @@ export function RemoveBook(id: number): $CancellablePromise<$models.RemoveBookRe
  */
 export function SaveQuickEdits(rows: $models.QuickEditRow[] | null): $CancellablePromise<$models.QuickEditSaveResult> {
     return $Call.ByID(793741923, rows);
+}
+
+/**
+ * SaveSmartShelf creates or updates a dynamic shelf.
+ */
+export function SaveSmartShelf($in: $models.SmartShelfInput): $CancellablePromise<$models.SmartShelfDetail> {
+    return $Call.ByID(1439789288, $in);
 }
 
 /**
@@ -244,6 +265,20 @@ export function SetReadingState($in: $models.ReadingUpdate): $CancellablePromise
  */
 export function SetTitleSort(bookID: number, sort: string): $CancellablePromise<$models.BookDetail> {
     return $Call.ByID(789912444, bookID, sort);
+}
+
+/**
+ * SmartShelf returns one shelf definition.
+ */
+export function SmartShelf(id: number): $CancellablePromise<$models.SmartShelfDetail> {
+    return $Call.ByID(3239525101, id);
+}
+
+/**
+ * SmartShelves returns all dynamic shelves with live counts.
+ */
+export function SmartShelves(): $CancellablePromise<$models.SmartShelfSummary[] | null> {
+    return $Call.ByID(1867417249);
 }
 
 /**

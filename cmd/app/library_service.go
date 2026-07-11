@@ -38,6 +38,7 @@ type LibraryService struct {
 	coverDir  string
 	meta      *metadata.Client
 	gutenberg *gutenberg.Catalog
+	calibre   *CalibreService
 }
 
 // ImportProgress is the per-file payload sent on the "import:progress" event.

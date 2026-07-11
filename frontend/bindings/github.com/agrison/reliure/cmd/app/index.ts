@@ -56,5 +56,9 @@ export type {
     ReadingUpdate,
     RemoveBookResult,
     SendResult,
-    SidebarItem
+    SidebarItem,
+    SmartShelfDetail,
+    SmartShelfInput,
+    SmartShelfRule,
+    SmartShelfSummary
 } from "./models.js";

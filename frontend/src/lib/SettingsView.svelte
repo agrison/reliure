@@ -12,6 +12,8 @@
     onSetOPDSPort,
     onSetCalibreEnabled,
     onSetWriteMetadataToFile,
+    onSetFeatureDiscover,
+    onSetFeatureSmartShelves,
     onRegenerateCovers,
     onSetTheme,
     onChooseKoreader,
@@ -29,6 +31,8 @@
     onSetOPDSPort: (port: number) => void;
     onSetCalibreEnabled: (enabled: boolean) => void;
     onSetWriteMetadataToFile: (enabled: boolean) => void;
+    onSetFeatureDiscover: (enabled: boolean) => void;
+    onSetFeatureSmartShelves: (enabled: boolean) => void;
     onRegenerateCovers: () => Promise<void> | void;
     onSetTheme: (theme: "system" | "light" | "dark") => void;
     onChooseKoreader: () => Promise<void> | void;
@@ -293,6 +297,51 @@
             </button>
           {/if}
         </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Fonctionnalités</h2>
+        <p>Modules optionnels affichés dans la barre latérale.</p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Découvrir</h3>
+            <p>Recherche et import depuis Project Gutenberg.</p>
+          </div>
+        </div>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={settings.featureDiscover}
+            onchange={(e) => onSetFeatureDiscover((e.target as HTMLInputElement).checked)}
+          />
+          <span>Afficher Découvrir</span>
+        </label>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Étagères intelligentes</h3>
+            <p>Collections dynamiques basées sur des règles.</p>
+          </div>
+        </div>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={settings.featureSmartShelves}
+            onchange={(e) => onSetFeatureSmartShelves((e.target as HTMLInputElement).checked)}
+          />
+          <span>Afficher les étagères</span>
+        </label>
       </article>
     </div>
   </section>

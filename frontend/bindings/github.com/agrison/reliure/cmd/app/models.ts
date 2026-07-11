@@ -38,6 +38,8 @@ export interface AppSettings {
     "writeMetadataToFile": boolean;
     "theme": string;
     "koreaderSyncDir": string;
+    "featureDiscover": boolean;
+    "featureSmartShelves": boolean;
 }
 
 /**
@@ -490,6 +492,49 @@ export interface SendResult {
  * SidebarItem is a named entry (author/series/tag) with a book count.
  */
 export interface SidebarItem {
+    "id": number;
+    "name": string;
+    "count": number;
+}
+
+/**
+ * SmartShelfDetail is the full shelf definition plus its current book count.
+ */
+export interface SmartShelfDetail {
+    "id": number;
+    "name": string;
+    "match": string;
+    "rules": SmartShelfRule[] | null;
+    "position": number;
+    "count": number;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * SmartShelfInput creates or updates a smart shelf.
+ */
+export interface SmartShelfInput {
+    "id": number;
+    "name": string;
+    "match": string;
+    "rules": SmartShelfRule[] | null;
+    "position": number;
+}
+
+/**
+ * SmartShelfRule is one UI-editable predicate in a dynamic shelf.
+ */
+export interface SmartShelfRule {
+    "field": string;
+    "operator": string;
+    "value": string;
+}
+
+/**
+ * SmartShelfSummary is used by the sidebar and shelf list.
+ */
+export interface SmartShelfSummary {
     "id": number;
     "name": string;
     "count": number;

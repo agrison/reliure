@@ -8,6 +8,8 @@ export type View =
   | { kind: "settings" }
   | { kind: "gutenberg" }
   | { kind: "annotations" }
+  | { kind: "shelves" }
+  | { kind: "shelf"; id: number; name: string }
   | { kind: "reading"; status: ReadingStatus }
   | { kind: "author"; id: number; name: string }
   | { kind: "series"; id: number; name: string }
@@ -33,6 +35,10 @@ export function viewTitle(v: View): string {
       return "Découvrir";
     case "annotations":
       return "Annotations";
+    case "shelves":
+      return "Étagères";
+    case "shelf":
+      return v.name;
     case "reading":
       return readingStatusLabels[v.status];
     case "author":

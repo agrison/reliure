@@ -23,6 +23,8 @@ type AppSettings struct {
 	WriteMetadataToFile bool   `json:"writeMetadataToFile"`
 	Theme               string `json:"theme"`
 	KoreaderSyncDir     string `json:"koreaderSyncDir"`
+	FeatureDiscover     bool   `json:"featureDiscover"`
+	FeatureSmartShelves bool   `json:"featureSmartShelves"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
@@ -35,6 +37,8 @@ func toAppSettings(s settings.Settings) AppSettings {
 		WriteMetadataToFile: s.WriteMetadataToFile,
 		Theme:               s.Theme,
 		KoreaderSyncDir:     s.KoreaderSyncDir,
+		FeatureDiscover:     s.FeatureDiscover,
+		FeatureSmartShelves: s.FeatureSmartShelves,
 	}
 }
 
@@ -91,6 +95,22 @@ func (s *SettingsService) SetWriteMetadataToFile(enabled bool) (AppSettings, err
 func (s *SettingsService) SetTheme(theme string) (AppSettings, error) {
 	cur := s.store.Get()
 	cur.Theme = theme
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
+// SetFeatureDiscover toggles the Project Gutenberg discovery view.
+func (s *SettingsService) SetFeatureDiscover(enabled bool) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.FeatureDiscover = enabled
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
+// SetFeatureSmartShelves toggles rule-based smart shelves.
+func (s *SettingsService) SetFeatureSmartShelves(enabled bool) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.FeatureSmartShelves = enabled
 	next, err := s.store.Update(cur)
 	return toAppSettings(next), err
 }

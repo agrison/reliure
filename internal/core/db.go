@@ -25,6 +25,7 @@ type DB struct {
 	Series  *SeriesRepo
 	Tags    *TagRepo
 	Reading *ReadingRepo
+	Shelves *SmartShelfRepo
 }
 
 // Open opens (or creates) the database at path, applies pending migrations and
@@ -62,6 +63,7 @@ func Open(path string) (*DB, error) {
 	db.Series = &SeriesRepo{db: sqldb}
 	db.Tags = &TagRepo{db: sqldb}
 	db.Reading = &ReadingRepo{db: sqldb}
+	db.Shelves = &SmartShelfRepo{db: sqldb}
 	return db, nil
 }
 

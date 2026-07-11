@@ -18,6 +18,9 @@
     type DeviceBookState,
     type ReadingCard,
     type ReadingStatusCounts,
+    type SmartShelfDetail,
+    type SmartShelfInput,
+    type SmartShelfSummary,
     type KoreaderSyncResult,
     type CalibreSendProgress,
     type ImportProgress,
@@ -33,6 +36,7 @@
   import Discover from "./lib/Discover.svelte";
   import Annotations from "./lib/Annotations.svelte";
   import Dashboard from "./lib/Dashboard.svelte";
+  import SmartShelves from "./lib/SmartShelves.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import type { ApplyMetadataInput, ReadingUpdate } from "./lib/api";
 
@@ -55,6 +59,8 @@
   let authors = $state<SidebarItem[]>([]);
   let series = $state<SidebarItem[]>([]);
   let tags = $state<SidebarItem[]>([]);
+  let smartShelves = $state<SmartShelfSummary[]>([]);
+  let shelvesLoading = $state(false);
   let authorGroups = $state<SidebarItem[]>([]);
   let seriesGroups = $state<SidebarItem[]>([]);
   let tagGroups = $state<SidebarItem[]>([]);
@@ -82,6 +88,7 @@
       const q = query.trim();
       let res: BookCard[] | null;
       if (q) res = await LibraryService.Search(q);
+      else if (view.kind === "shelf") res = await LibraryService.BooksBySmartShelf(view.id);
       else if (view.kind === "reading") res = await LibraryService.BooksByReadingStatus(view.status);
       else if (view.kind === "author") res = view.id === 0 ? await LibraryService.BooksWithoutAuthor() : await LibraryService.BooksByAuthor(view.id);
       else if (view.kind === "series") res = view.id === 0 ? await LibraryService.BooksWithoutSeries() : await LibraryService.BooksBySeries(view.id);
@@ -157,7 +164,7 @@
       settings = await SettingsService.Get();
       toast = syncSummary(res);
       setTimeout(() => (toast = ""), 7000);
-      await Promise.all([loadReadingStates(), loadBooks()]);
+      await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
       toast = `Synchronisation impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -173,7 +180,7 @@
       const res = await KOReaderService.Sync();
       toast = syncSummary(res);
       setTimeout(() => (toast = ""), 7000);
-      await Promise.all([loadReadingStates(), loadBooks()]);
+      await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
       toast = `Synchronisation impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -193,7 +200,7 @@
         `${res.matched} livre${res.matched === 1 ? "" : "s"} synchronisé${res.matched === 1 ? "" : "s"} depuis la liseuse` +
         (res.annotations ? ` · ${res.annotations} surlignage${res.annotations === 1 ? "" : "s"}` : "");
       setTimeout(() => (toast = ""), 7000);
-      await Promise.all([loadReadingStates(), loadBooks()]);
+      await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
       toast = `Synchronisation impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -203,11 +210,12 @@
   }
 
   async function loadSidebar() {
-    const [t, a, s, g, ag, sg, tg] = await Promise.all([
+    const [t, a, s, g, shelves, ag, sg, tg] = await Promise.all([
       LibraryService.Stats(),
       LibraryService.Authors(),
       LibraryService.SeriesList(),
       LibraryService.Tags(),
+      LibraryService.SmartShelves(),
       LibraryService.AuthorGroups(),
       LibraryService.SeriesGroups(),
       LibraryService.TagGroups(),
@@ -216,6 +224,7 @@
     authors = a ?? [];
     series = s ?? [];
     tags = g ?? [];
+    smartShelves = shelves ?? [];
     authorGroups = ag ?? [];
     seriesGroups = sg ?? [];
     tagGroups = tg ?? [];
@@ -229,9 +238,41 @@
     clearSelection();
     if (v.kind === "quickedit") loadQuickEdit();
     else if (v.kind === "settings") loadSettings();
+    else if (v.kind === "shelves") loadSmartShelves();
     else if (v.kind === "gutenberg" || v.kind === "annotations" || v.kind === "dashboard") {
       /* Discover, Annotations and Dashboard load their own data */
     } else loadBooks();
+  }
+
+  async function loadSmartShelves() {
+    shelvesLoading = true;
+    try {
+      smartShelves = (await LibraryService.SmartShelves()) ?? [];
+    } finally {
+      shelvesLoading = false;
+    }
+  }
+
+  async function saveSmartShelf(input: SmartShelfInput): Promise<SmartShelfDetail> {
+    const saved = await LibraryService.SaveSmartShelf(input);
+    toast = `Étagère « ${saved.name} » enregistrée`;
+    setTimeout(() => (toast = ""), 4000);
+    await loadSmartShelves();
+    if (view.kind === "shelf" && view.id === saved.id) {
+      view = { kind: "shelf", id: saved.id, name: saved.name };
+      await loadBooks();
+    }
+    return saved;
+  }
+
+  async function deleteSmartShelf(id: number) {
+    await LibraryService.DeleteSmartShelf(id);
+    toast = "Étagère supprimée";
+    setTimeout(() => (toast = ""), 4000);
+    await loadSmartShelves();
+    if (view.kind === "shelf" && view.id === id) {
+      selectView({ kind: "shelves" });
+    }
   }
 
   async function loadSettings() {
@@ -376,7 +417,7 @@
     if (!detail) return;
     try {
       detail = await LibraryService.SetReadingState(update);
-      await Promise.all([loadReadingStates(), loadBooks()]);
+      await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
       toast = `Enregistrement impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -465,6 +506,14 @@
   async function setWriteMetadataToFile(enabled: boolean) {
     settings = await SettingsService.SetWriteMetadataToFile(enabled);
   }
+  async function setFeatureDiscover(enabled: boolean) {
+    settings = await SettingsService.SetFeatureDiscover(enabled);
+    if (!enabled && view.kind === "gutenberg") selectView({ kind: "all" });
+  }
+  async function setFeatureSmartShelves(enabled: boolean) {
+    settings = await SettingsService.SetFeatureSmartShelves(enabled);
+    if (!enabled && (view.kind === "shelves" || view.kind === "shelf")) selectView({ kind: "all" });
+  }
 
   // applyTheme reflects the choice onto the document: "system" removes the
   // attribute so the OS preference (via CSS) governs; light/dark pin it. The
@@ -519,7 +568,8 @@
         (res.inventoryError ? " · inventaire non mis à jour" : "");
       setTimeout(() => (toast = ""), 6000);
       clearSelection();
-      await refreshDeviceStates();
+      await Promise.all([refreshDeviceStates(), loadSmartShelves()]);
+      if (view.kind === "shelf") await loadBooks();
     } catch (e) {
       toast = `Envoi impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -546,6 +596,8 @@
     const offCalibre = Events.On("calibre:status", (e: { data: CalibreStatus }) => {
       calibre = e.data;
       refreshDeviceStates();
+      loadSmartShelves();
+      if (view.kind === "shelf") loadBooks();
     });
     const offCalibreProgress = Events.On("calibre:progress", (e: { data: CalibreSendProgress }) => {
       const p = e.data;
@@ -568,6 +620,7 @@
       setTimeout(() => (toast = ""), 6000);
       loadSidebar();
       loadBooks();
+      loadSmartShelves();
     });
     return () => {
       offCalibre();
@@ -587,7 +640,7 @@
     return source.filter((item) => item.name.toLowerCase().includes(q));
   });
   const visibleCount = $derived(
-    view.kind === "quickedit" ? quickRows.length : view.kind === "settings" ? 0 : browseMode === "books" ? books.length : groupItems.length,
+    view.kind === "quickedit" ? quickRows.length : view.kind === "settings" || view.kind === "shelves" ? 0 : browseMode === "books" ? books.length : groupItems.length,
   );
 </script>
 
@@ -608,6 +661,9 @@
     {authors}
     {series}
     {tags}
+    shelves={smartShelves}
+    showDiscover={settings?.featureDiscover ?? true}
+    showSmartShelves={settings?.featureSmartShelves ?? true}
     opds={opdsStatus}
     {calibre}
     reading={readingCounts}
@@ -629,12 +685,12 @@
           </button>
         {/if}
         <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? "Auteurs" : browseMode === "series" ? "Séries" : "Tags"}</h1>
-        {#if view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard"}
+        {#if view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
           <span class="n">{visibleCount}</span>
         {/if}
       </div>
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
         <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path
@@ -670,7 +726,7 @@
         </div>
       {/if}
 
-      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard"}
+      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
         <div class="viewtoggle" role="group" aria-label="Affichage">
           <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
@@ -681,7 +737,7 @@
         </div>
       {/if}
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
         <button class="import" onclick={doImport} disabled={importing}>
           {importing ? "Import…" : "Importer"}
         </button>
@@ -724,6 +780,8 @@
             onSetOPDSPort={setOPDSPort}
             onSetCalibreEnabled={setCalibreEnabled}
             onSetWriteMetadataToFile={setWriteMetadataToFile}
+            onSetFeatureDiscover={setFeatureDiscover}
+            onSetFeatureSmartShelves={setFeatureSmartShelves}
             onRegenerateCovers={regenerateCovers}
             onSetTheme={setTheme}
             onChooseKoreader={chooseKoreaderAndSync}
@@ -736,6 +794,15 @@
         {/if}
       {:else if view.kind === "dashboard"}
         <Dashboard onOpenBook={openBook} onSelectStatus={(status) => selectView({ kind: "reading", status })} />
+      {:else if view.kind === "shelves"}
+        <SmartShelves
+          shelves={smartShelves}
+          loading={shelvesLoading}
+          onOpen={(shelf) => selectView({ kind: "shelf", id: shelf.id, name: shelf.name })}
+          onLoad={(id) => LibraryService.SmartShelf(id)}
+          onSave={saveSmartShelf}
+          onDelete={deleteSmartShelf}
+        />
       {:else if view.kind === "gutenberg"}
         <Discover />
       {:else if view.kind === "annotations"}

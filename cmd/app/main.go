@@ -83,6 +83,7 @@ func main() {
 		settings:  store,
 		inventory: inventoryStore,
 	}
+	libSvc.calibre = calibreSvc
 	emitCalibreStatus := func() {
 		application.Get().Event.Emit(calibreStatusEvent, calibreSvc.Status())
 	}

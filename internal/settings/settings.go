@@ -41,6 +41,12 @@ type Settings struct {
 	// (a mounted device or a synced copy of the reader's library), remembered so
 	// re-syncing reading progress is one click.
 	KoreaderSyncDir string `json:"koreaderSyncDir"`
+	// FeatureDiscover controls whether the Project Gutenberg discovery view is
+	// shown in the UI.
+	FeatureDiscover bool `json:"featureDiscover"`
+	// FeatureSmartShelves controls whether dynamic rule-based shelves are shown
+	// in the UI.
+	FeatureSmartShelves bool `json:"featureSmartShelves"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.
@@ -60,7 +66,7 @@ func Open(path, defaultLibraryDir string) (*Store, error) {
 	data, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		s.cur = s.normalize(Settings{})
+		s.cur = s.normalize(Settings{FeatureDiscover: true, FeatureSmartShelves: true})
 		return s, s.save()
 	case err != nil:
 		return nil, err
@@ -69,6 +75,15 @@ func Open(path, defaultLibraryDir string) (*Store, error) {
 	var loaded Settings
 	if err := json.Unmarshal(data, &loaded); err != nil {
 		return nil, err
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err == nil {
+		if _, ok := raw["featureDiscover"]; !ok {
+			loaded.FeatureDiscover = true
+		}
+		if _, ok := raw["featureSmartShelves"]; !ok {
+			loaded.FeatureSmartShelves = true
+		}
 	}
 	s.cur = s.normalize(loaded)
 	return s, nil
