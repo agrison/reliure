@@ -180,6 +180,27 @@ export interface CoverResult {
 }
 
 /**
+ * Dashboard is the full analytics payload.
+ */
+export interface Dashboard {
+    "books": number;
+    "authors": number;
+    "series": number;
+    "tags": number;
+    "files": number;
+    "totalSize": number;
+    "onDevice": number;
+    "annotations": number;
+    "reading": ReadingBreakdown;
+    "formats": NameCount[] | null;
+    "languages": NameCount[] | null;
+    "topAuthors": NameCount[] | null;
+    "topTags": NameCount[] | null;
+    "addedByMonth": NameCount[] | null;
+    "recent": BookCard[] | null;
+}
+
+/**
  * DeviceBookState tells the UI whether a local book is known to be on the
  * currently connected device according to the last `.reliure` inventory.
  */
@@ -270,6 +291,14 @@ export interface KoreaderSyncResult {
  */
 export interface LibraryStats {
     "books": number;
+}
+
+/**
+ * NameCount is a labelled magnitude for the dashboard's bar charts.
+ */
+export interface NameCount {
+    "name": string;
+    "count": number;
 }
 
 /**
@@ -372,6 +401,17 @@ export interface QuickEditSaveResult {
 export interface QuickEditSavedBook {
     "id": number;
     "updatedAt": string;
+}
+
+/**
+ * ReadingBreakdown splits the library by reading status (unread = everything
+ * not tracked or explicitly new).
+ */
+export interface ReadingBreakdown {
+    "complete": number;
+    "reading": number;
+    "abandoned": number;
+    "unread": number;
 }
 
 /**

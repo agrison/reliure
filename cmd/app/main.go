@@ -77,10 +77,11 @@ func main() {
 	// Calibre wireless (push) server. Connection changes are pushed to the UI
 	// as "calibre:status" events (full status, incl. port/address) so the
 	// sidebar reflects the connected reader.
+	inventoryStore := device.NewStore(filepath.Join(configDir, "devices"))
 	calibreSvc := &CalibreService{
 		db:        db,
 		settings:  store,
-		inventory: device.NewStore(filepath.Join(configDir, "devices")),
+		inventory: inventoryStore,
 	}
 	emitCalibreStatus := func() {
 		application.Get().Event.Emit(calibreStatusEvent, calibreSvc.Status())
@@ -104,6 +105,7 @@ func main() {
 			application.NewService(opdsSvc),
 			application.NewService(calibreSvc),
 			application.NewService(&KOReaderService{db: db, store: store}),
+			application.NewService(&StatsService{db: db, inventory: inventoryStore}),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(coverDir),

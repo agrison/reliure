@@ -66,6 +66,13 @@
     <span>Reliure</span>
   </div>
 
+  <button class="root tool" class:active={active.kind === "dashboard"} onclick={() => onSelect({ kind: "dashboard" })}>
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
+      <path d="M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-4H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+    </svg>
+    <span>Tableau de bord</span>
+  </button>
+
   <button class="root" class:active={active.kind === "all"} onclick={() => onSelect({ kind: "all" })}>
     <span>Tous les livres</span>
     <span class="count">{total}</span>

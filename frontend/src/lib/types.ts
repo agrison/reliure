@@ -3,6 +3,7 @@ export type ReadingStatus = "reading" | "complete" | "abandoned";
 
 export type View =
   | { kind: "all" }
+  | { kind: "dashboard" }
   | { kind: "quickedit" }
   | { kind: "settings" }
   | { kind: "gutenberg" }
@@ -22,6 +23,8 @@ export function viewTitle(v: View): string {
   switch (v.kind) {
     case "all":
       return "Tous les livres";
+    case "dashboard":
+      return "Tableau de bord";
     case "quickedit":
       return "Édition rapide";
     case "settings":

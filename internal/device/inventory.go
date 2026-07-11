@@ -51,6 +51,38 @@ func NewStore(dir string) *Store {
 	return &Store{dir: dir}
 }
 
+// AllBookIDs returns the set of local book ids present in ANY device inventory
+// (a book counts once even if sent to several readers). Used by the dashboard.
+func (s *Store) AllBookIDs() (map[int64]bool, error) {
+	entries, err := os.ReadDir(s.dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return map[int64]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	ids := map[int64]bool{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.dir, e.Name()))
+		if err != nil {
+			continue // skip an unreadable inventory rather than fail the dashboard
+		}
+		var inv Inventory
+		if err := json.Unmarshal(data, &inv); err != nil {
+			continue
+		}
+		for _, entry := range inv.Entries {
+			if entry.BookID > 0 {
+				ids[entry.BookID] = true
+			}
+		}
+	}
+	return ids, nil
+}
+
 // Load returns the known inventory for a device. Missing inventories return an
 // empty document; corrupt JSON is reported so callers can surface/log it.
 func (s *Store) Load(deviceName string) (*Inventory, error) {

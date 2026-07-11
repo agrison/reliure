@@ -171,7 +171,11 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `internal/koreader`, matches each to a book (title+author, then file basename,
   then a unique title), and upserts `reading_state` + `annotation`;
   `ReadingStates` feeds the grid's progress bars and annotation badges.
-  `SettingsService`
+  `StatsService.Dashboard` assembles the analytics dashboard from a handful of
+  aggregate queries (`internal/core/stats.go`: file size/format/language counts,
+  additions per month) plus reading breakdown and the device inventory; the
+  frontend renders it with dependency-free SVG/CSS charts (single-hue magnitude
+  bars + a labelled reading status bar). `SettingsService`
   reads/writes preferences. `OPDSService` starts, stops and reports the local
   pull catalog URL. `CalibreService` controls the push server, sends books,
   updates/sends `.reliure`, and exposes per-book device presence states to the

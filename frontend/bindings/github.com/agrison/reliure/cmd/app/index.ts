@@ -7,13 +7,15 @@ import * as KOReaderService from "./koreaderservice.js";
 import * as LibraryService from "./libraryservice.js";
 import * as OPDSService from "./opdsservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as StatsService from "./statsservice.js";
 export {
     App,
     CalibreService,
     KOReaderService,
     LibraryService,
     OPDSService,
-    SettingsService
+    SettingsService,
+    StatsService
 };
 
 export type {
@@ -30,6 +32,7 @@ export type {
     CalibreStatus,
     Contributor,
     CoverResult,
+    Dashboard,
     DeviceBookState,
     FileInfo,
     GutenbergBook,
@@ -38,6 +41,7 @@ export type {
     ImportSummary,
     KoreaderSyncResult,
     LibraryStats,
+    NameCount,
     OPDSStatus,
     OnlineCandidate,
     OnlineSearchResult,
@@ -46,6 +50,7 @@ export type {
     QuickEditRowError,
     QuickEditSaveResult,
     QuickEditSavedBook,
+    ReadingBreakdown,
     ReadingCard,
     ReadingStatusCounts,
     ReadingUpdate,
