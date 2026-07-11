@@ -37,6 +37,10 @@ type Settings struct {
 	WriteMetadataToFile bool `json:"writeMetadataToFile"`
 	// Theme is the UI appearance: "system" (follow the OS), "light" or "dark".
 	Theme string `json:"theme"`
+	// KoreaderSyncDir is the last folder scanned for KOReader `.sdr` sidecars
+	// (a mounted device or a synced copy of the reader's library), remembered so
+	// re-syncing reading progress is one click.
+	KoreaderSyncDir string `json:"koreaderSyncDir"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.

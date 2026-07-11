@@ -103,6 +103,7 @@ func main() {
 			application.NewService(&SettingsService{store: store}),
 			application.NewService(opdsSvc),
 			application.NewService(calibreSvc),
+			application.NewService(&KOReaderService{db: db, store: store}),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(coverDir),

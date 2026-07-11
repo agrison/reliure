@@ -16,6 +16,8 @@ type captured struct {
 	lpath string
 	body  []byte
 	title string
+	// files is the device's virtual filesystem for GET_BOOK_FILE_SEGMENT.
+	files map[string][]byte
 }
 
 // fakeDevice plays a minimal KOReader: it answers the handshake and stores the
@@ -60,6 +62,15 @@ func fakeDevice(conn net.Conn, out *captured) error {
 			}
 			out.lpath = lpath
 			out.body = body
+		case OpGetBookFileSegment:
+			lpath, _ := msg.Payload["lpath"].(string)
+			data, ok := out.files[lpath]
+			if !ok {
+				_ = writeMessage(conn, OpNoop, map[string]any{}) // not found
+				continue
+			}
+			_ = writeMessage(conn, OpOK, map[string]any{"fileLength": len(data)})
+			_, _ = conn.Write(data)
 		case OpNoop:
 			if ejecting, _ := msg.Payload["ejecting"].(bool); ejecting {
 				return nil
@@ -118,6 +129,48 @@ func TestSessionHandshakeAndSendBook(t *testing.T) {
 	}
 	if got.title != "La Main gauche de la nuit" {
 		t.Errorf("device metadata title = %q", got.title)
+	}
+}
+
+func TestSessionGetFile(t *testing.T) {
+	clientConn, deviceConn := net.Pipe()
+	sidecar := []byte(`return { ["percent_finished"] = 0.5 }`)
+	got := captured{files: map[string][]byte{
+		"Le Guin/Ekumen/04 Main gauche.sdr/metadata.epub.lua": sidecar,
+	}}
+	deviceErr := make(chan error, 1)
+	go func() { deviceErr <- fakeDevice(deviceConn, &got) }()
+
+	sess := newSession(clientConn)
+	if err := sess.Handshake("Lib", "uuid"); err != nil {
+		t.Fatalf("Handshake: %v", err)
+	}
+
+	// An existing file streams back verbatim.
+	data, found, err := sess.GetFile("Le Guin/Ekumen/04 Main gauche.sdr/metadata.epub.lua")
+	if err != nil {
+		t.Fatalf("GetFile: %v", err)
+	}
+	if !found || string(data) != string(sidecar) {
+		t.Fatalf("found=%v data=%q", found, data)
+	}
+
+	// A missing file replies NOOP → found=false, no hang, and the session stays
+	// usable for the next request.
+	_, found, err = sess.GetFile("nope/metadata.epub.lua")
+	if err != nil {
+		t.Fatalf("GetFile(missing): %v", err)
+	}
+	if found {
+		t.Error("expected found=false for a missing file")
+	}
+	// Prove the stream is still aligned after the two exchanges.
+	if data, found, err := sess.GetFile("Le Guin/Ekumen/04 Main gauche.sdr/metadata.epub.lua"); err != nil || !found || string(data) != string(sidecar) {
+		t.Fatalf("stream misaligned: found=%v err=%v", found, err)
+	}
+	sess.Close()
+	if err := <-deviceErr; err != nil {
+		t.Fatalf("device error: %v", err)
 	}
 }
 

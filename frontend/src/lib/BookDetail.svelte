@@ -79,6 +79,9 @@
   const roleLabels: Record<string, string> = {
     aut: "", trl: "trad.", edt: "éd.", ill: "ill.", ctb: "contrib.",
   };
+  const statusLabels: Record<string, string> = {
+    reading: "En cours", complete: "Terminé", abandoned: "Abandonné", new: "À lire",
+  };
 
   $effect(() => {
     if (!editing) form = editForm(book);
@@ -300,6 +303,36 @@
       </div>
     {/each}
   </div>
+
+  {#if book.percent > 0 || book.readingStatus || book.annotations?.length}
+    <div class="meta">
+      <h3>Lecture</h3>
+      {#if book.readingStatus || book.percent > 0}
+        <div class="readbar">
+          <div class="rtrack"><div class="rfill" class:done={book.readingStatus === "complete"} style="width:{Math.round((book.readingStatus === 'complete' ? 1 : book.percent) * 100)}%"></div></div>
+          <span class="rpct">{book.readingStatus === "complete" ? "Terminé" : Math.round(book.percent * 100) + " %"}</span>
+        </div>
+        <div class="readmeta">
+          {#if book.readingStatus}<span class="rstatus">{statusLabels[book.readingStatus] ?? book.readingStatus}</span>{/if}
+          {#if book.pages > 0}<span>page {Math.max(1, Math.round((book.readingStatus === "complete" ? 1 : book.percent) * book.pages))} / {book.pages}</span>{/if}
+          {#if book.lastReadAt}<span>Dernière lecture : {book.lastReadAt}</span>{/if}
+        </div>
+      {/if}
+      {#if book.annotations?.length}
+        <div class="annos">
+          <div class="annohead">{book.annotations.length} surlignage{book.annotations.length === 1 ? "" : "s"} / note{book.annotations.length === 1 ? "" : "s"}</div>
+          {#each book.annotations as a}
+            <div class="anno">
+              {#if a.chapter}<div class="achap">{a.chapter}</div>{/if}
+              {#if a.text}<blockquote class="atext">{a.text}</blockquote>{/if}
+              {#if a.note}<div class="anote">✎ {a.note}</div>{/if}
+              {#if a.createdAt}<div class="adate">{a.createdAt}</div>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if book.remotePath}
     <div class="meta">
@@ -737,6 +770,88 @@
     font-weight: 500;
     overflow-wrap: anywhere;
     user-select: text;
+  }
+
+  .readbar {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .rtrack {
+    flex: 1;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--inset);
+    overflow: hidden;
+  }
+  .rfill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+  }
+  .rfill.done {
+    background: var(--ok);
+  }
+  .rpct {
+    flex: none;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .readmeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    margin-top: 0.5rem;
+    font-size: 0.76rem;
+    color: var(--faint);
+  }
+  .rstatus {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .annos {
+    margin-top: 1rem;
+  }
+  .annohead {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+    margin-bottom: 0.5rem;
+  }
+  .anno {
+    padding: 0.55rem 0.65rem;
+    margin-bottom: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .achap {
+    font-size: 0.7rem;
+    color: var(--accent);
+    margin-bottom: 0.3rem;
+  }
+  .atext {
+    margin: 0;
+    padding-left: 0.6rem;
+    border-left: 2px solid var(--border-hi);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--text);
+    user-select: text;
+  }
+  .anote {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    user-select: text;
+  }
+  .adate {
+    margin-top: 0.35rem;
+    font-size: 0.68rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
   }
 
   .actions {

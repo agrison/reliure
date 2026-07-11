@@ -22,6 +22,7 @@ type AppSettings struct {
 	OPDSPort            int    `json:"opdsPort"`
 	WriteMetadataToFile bool   `json:"writeMetadataToFile"`
 	Theme               string `json:"theme"`
+	KoreaderSyncDir     string `json:"koreaderSyncDir"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
@@ -33,6 +34,7 @@ func toAppSettings(s settings.Settings) AppSettings {
 		OPDSPort:            s.OPDSPort,
 		WriteMetadataToFile: s.WriteMetadataToFile,
 		Theme:               s.Theme,
+		KoreaderSyncDir:     s.KoreaderSyncDir,
 	}
 }
 

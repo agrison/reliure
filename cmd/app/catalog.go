@@ -67,6 +67,21 @@ type BookDetail struct {
 	RemotePathOverrideEnabled bool          `json:"remotePathOverrideEnabled"`
 	RemotePathOverride        string        `json:"remotePathOverride"`
 	RemotePath                string        `json:"remotePath"`
+	// Reading progress mirrored from KOReader (zero/empty when never synced).
+	Percent       float64      `json:"percent"`
+	Pages         int          `json:"pages"`
+	ReadingStatus string       `json:"readingStatus"`
+	LastReadAt    string       `json:"lastReadAt"`
+	Annotations   []Annotation `json:"annotations"`
+}
+
+// Annotation is a KOReader highlight and/or note for the detail view.
+type Annotation struct {
+	Text      string `json:"text"`
+	Note      string `json:"note"`
+	Chapter   string `json:"chapter"`
+	Drawer    string `json:"drawer"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // BookUpdate is the editable metadata payload sent by the frontend. Files are
@@ -192,6 +207,16 @@ func (s *LibraryService) BooksByTag(id int64) ([]BookCard, error) {
 	return cards(books), nil
 }
 
+// BooksByReadingStatus returns books in a given KOReader reading status
+// ("reading", "complete", "abandoned").
+func (s *LibraryService) BooksByReadingStatus(status string) ([]BookCard, error) {
+	books, err := s.db.Books.ListByReadingStatus(status)
+	if err != nil {
+		return nil, err
+	}
+	return cards(books), nil
+}
+
 // BooksWithoutAuthor returns books that have no author link.
 func (s *LibraryService) BooksWithoutAuthor() ([]BookCard, error) {
 	books, err := s.db.Books.ListWithoutAuthors()
@@ -304,6 +329,19 @@ func (s *LibraryService) Book(id int64) (BookDetail, error) {
 			SHA256:  f.SHA256,
 			AddedAt: formatTime(f.AddedAt),
 		})
+	}
+	if st, ok, err := s.db.Reading.State(b.ID); err == nil && ok {
+		d.Percent = st.Percent
+		d.Pages = st.Pages
+		d.ReadingStatus = st.Status
+		d.LastReadAt = st.LastReadAt
+	}
+	if anns, err := s.db.Reading.Annotations(b.ID); err == nil {
+		for _, a := range anns {
+			d.Annotations = append(d.Annotations, Annotation{
+				Text: a.Text, Note: a.Note, Chapter: a.Chapter, Drawer: a.Drawer, CreatedAt: a.CreatedAt,
+			})
+		}
 	}
 	return d, nil
 }

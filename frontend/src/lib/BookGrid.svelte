@@ -1,11 +1,12 @@
 <script lang="ts">
-  import type { BookCard, DeviceBookState } from "./api";
+  import type { BookCard, DeviceBookState, ReadingCard } from "./api";
 
   let {
     books,
     mode,
     selectedIds,
     deviceStates,
+    readingStates,
     onOpen,
     onToggleSelect,
   }: {
@@ -13,9 +14,28 @@
     mode: "grid" | "list";
     selectedIds: number[];
     deviceStates: Record<number, DeviceBookState>;
+    readingStates: Record<number, ReadingCard>;
     onOpen: (id: number) => void;
     onToggleSelect: (id: number) => void;
   } = $props();
+
+  // Progress to show on a card: a completed book reads as full, whatever the
+  // last recorded percentage.
+  function progress(state: ReadingCard | undefined): number {
+    if (!state) return 0;
+    if (state.status === "complete") return 1;
+    return state.percent ?? 0;
+  }
+
+  function progressTitle(state: ReadingCard | undefined): string {
+    if (!state) return "";
+    const pct = Math.round(progress(state) * 100);
+    if (state.pages > 0) {
+      const page = Math.max(1, Math.round(progress(state) * state.pages));
+      return `${pct} % · page ${page} / ${state.pages}`;
+    }
+    return `${pct} % lu`;
+  }
 
   const selected = $derived(new Set(selectedIds));
 
@@ -69,6 +89,18 @@
               {deviceLabel(deviceStates[b.id])}
             </span>
           {/if}
+          {#if readingStates[b.id]?.annotations}
+            <span class="notes" title="{readingStates[b.id].annotations} surlignage(s) / note(s)">✎ {readingStates[b.id].annotations}</span>
+          {/if}
+          {#if progress(readingStates[b.id]) > 0}
+            <span class="progress" title={progressTitle(readingStates[b.id])}>
+              <span
+                class="pfill"
+                class:done={readingStates[b.id]?.status === "complete"}
+                style="width:{Math.round(progress(readingStates[b.id]) * 100)}%"
+              ></span>
+            </span>
+          {/if}
         </div>
         <div class="cap">
           <div class="t ellipsis">{b.title}</div>
@@ -115,6 +147,11 @@
           >
             {deviceLabel(deviceStates[b.id])}
           </div>
+        {/if}
+        {#if progress(readingStates[b.id]) > 0}
+          <span class="readpct" class:done={readingStates[b.id]?.status === "complete"}>
+            {readingStates[b.id]?.status === "complete" ? "Lu" : Math.round(progress(readingStates[b.id]) * 100) + " %"}
+          </span>
         {/if}
         <div class="formats">
           {#each b.formats as f}<span class="tag">{f}</span>{/each}
@@ -217,6 +254,46 @@
     background: color-mix(in srgb, var(--accent) 82%, #0b1410);
     color: var(--accent-ink);
     border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  }
+  .notes {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    padding: 0.14rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.62);
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    font-size: 0.64rem;
+    font-weight: 650;
+    pointer-events: none;
+  }
+  .progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 5px;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .pfill {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+  }
+  .pfill.done {
+    background: var(--ok);
+  }
+  .readpct {
+    justify-self: end;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .readpct.done {
+    color: var(--ok);
+    font-weight: 650;
   }
   .ph {
     width: 100%;

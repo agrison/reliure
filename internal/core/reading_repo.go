@@ -1,0 +1,192 @@
+package core
+
+import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"time"
+)
+
+// ReadingState mirrors a book's KOReader progress.
+type ReadingState struct {
+	BookID     int64
+	Percent    float64 // 0..1
+	Pages      int     // total pages of the device rendering (0 = unknown)
+	Status     string  // reading|complete|abandoned|new
+	Device     string
+	LastReadAt string // KOReader summary.modified, verbatim
+	SyncedAt   time.Time
+}
+
+// Annotation is a highlight and/or note attached to a book.
+type Annotation struct {
+	ID        int64
+	BookID    int64
+	Text      string
+	Note      string
+	Chapter   string
+	Drawer    string
+	CreatedAt string // device datetime, verbatim
+}
+
+// ReadingRepo persists reading progress and annotations.
+type ReadingRepo struct{ db *sql.DB }
+
+// UpsertState inserts or replaces a book's reading state.
+func (r *ReadingRepo) UpsertState(s ReadingState) error {
+	if s.SyncedAt.IsZero() {
+		s.SyncedAt = time.Now().UTC()
+	}
+	_, err := r.db.Exec(`
+		INSERT INTO reading_state (book_id, percent, pages, status, device, last_read_at, synced_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(book_id) DO UPDATE SET
+			percent = excluded.percent,
+			pages = excluded.pages,
+			status = excluded.status,
+			device = excluded.device,
+			last_read_at = excluded.last_read_at,
+			synced_at = excluded.synced_at`,
+		s.BookID, s.Percent, s.Pages, s.Status, s.Device, s.LastReadAt, s.SyncedAt.Format(time.RFC3339))
+	return err
+}
+
+// State returns a book's reading state, if any.
+func (r *ReadingRepo) State(bookID int64) (ReadingState, bool, error) {
+	row := r.db.QueryRow(`
+		SELECT book_id, percent, pages, status, device, last_read_at, synced_at
+		FROM reading_state WHERE book_id = ?`, bookID)
+	s, err := scanState(row)
+	if err == sql.ErrNoRows {
+		return ReadingState{}, false, nil
+	}
+	if err != nil {
+		return ReadingState{}, false, err
+	}
+	return s, true, nil
+}
+
+// AllStates returns every reading state, keyed by book id (for grid badges).
+func (r *ReadingRepo) AllStates() (map[int64]ReadingState, error) {
+	rows, err := r.db.Query(`
+		SELECT book_id, percent, pages, status, device, last_read_at, synced_at FROM reading_state`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int64]ReadingState)
+	for rows.Next() {
+		s, err := scanState(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[s.BookID] = s
+	}
+	return out, rows.Err()
+}
+
+// ReplaceAnnotations swaps a book's annotations for the given set in one
+// transaction, so a re-sync reflects the device's current state exactly. The
+// dedup key (text+note+chapter+datetime) collapses accidental duplicates.
+func (r *ReadingRepo) ReplaceAnnotations(bookID int64, anns []Annotation) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM annotation WHERE book_id = ?`, bookID); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`
+		INSERT OR IGNORE INTO annotation (book_id, text, note, chapter, drawer, created_at, dedup_key)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, a := range anns {
+		key := annotationKey(a)
+		if _, err := stmt.Exec(a.BookID, a.Text, a.Note, a.Chapter, a.Drawer, a.CreatedAt, key); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// Annotations returns a book's annotations, newest-created first.
+func (r *ReadingRepo) Annotations(bookID int64) ([]Annotation, error) {
+	rows, err := r.db.Query(`
+		SELECT id, book_id, text, note, chapter, drawer, created_at
+		FROM annotation WHERE book_id = ? ORDER BY created_at DESC, id DESC`, bookID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Annotation
+	for rows.Next() {
+		var a Annotation
+		if err := rows.Scan(&a.ID, &a.BookID, &a.Text, &a.Note, &a.Chapter, &a.Drawer, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// AnnotationCounts returns the number of annotations per book (for badges).
+func (r *ReadingRepo) AnnotationCounts() (map[int64]int, error) {
+	rows, err := r.db.Query(`SELECT book_id, COUNT(*) FROM annotation GROUP BY book_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int64]int)
+	for rows.Next() {
+		var id int64
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}
+
+// StatusCounts returns the number of books in each non-empty reading status
+// (e.g. {"reading": 3, "complete": 12}).
+func (r *ReadingRepo) StatusCounts() (map[string]int, error) {
+	rows, err := r.db.Query(`SELECT status, COUNT(*) FROM reading_state WHERE status != '' GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]int)
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return nil, err
+		}
+		out[status] = n
+	}
+	return out, rows.Err()
+}
+
+func scanState(s interface{ Scan(...any) error }) (ReadingState, error) {
+	var (
+		st     ReadingState
+		synced string
+	)
+	if err := s.Scan(&st.BookID, &st.Percent, &st.Pages, &st.Status, &st.Device, &st.LastReadAt, &synced); err != nil {
+		return ReadingState{}, err
+	}
+	if t, err := time.Parse(time.RFC3339, synced); err == nil {
+		st.SyncedAt = t
+	}
+	return st, nil
+}
+
+func annotationKey(a Annotation) string {
+	h := sha256.Sum256([]byte(a.Text + "\x00" + a.Note + "\x00" + a.Chapter + "\x00" + a.CreatedAt))
+	return hex.EncodeToString(h[:16])
+}

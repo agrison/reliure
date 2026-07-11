@@ -3,18 +3,22 @@
 
 import * as App from "./app.js";
 import * as CalibreService from "./calibreservice.js";
+import * as KOReaderService from "./koreaderservice.js";
 import * as LibraryService from "./libraryservice.js";
 import * as OPDSService from "./opdsservice.js";
 import * as SettingsService from "./settingsservice.js";
 export {
     App,
     CalibreService,
+    KOReaderService,
     LibraryService,
     OPDSService,
     SettingsService
 };
 
 export type {
+    AnnotatedBook,
+    Annotation,
     AppSettings,
     ApplyMetadataInput,
     BatchSeriesUpdate,
@@ -32,6 +36,7 @@ export type {
     GutenbergResult,
     ImportProgress,
     ImportSummary,
+    KoreaderSyncResult,
     LibraryStats,
     OPDSStatus,
     OnlineCandidate,
@@ -41,6 +46,8 @@ export type {
     QuickEditRowError,
     QuickEditSaveResult,
     QuickEditSavedBook,
+    ReadingCard,
+    ReadingStatusCounts,
     RemoveBookResult,
     SendResult,
     SidebarItem

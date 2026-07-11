@@ -65,11 +65,22 @@ author ──┐                          ┌── tag
 - **`file`** — one row per physical file (a book can have several formats,
   currently EPUB and PDF). `path` is UNIQUE (a file lives in exactly one place),
   and `sha256` is indexed to support deduplication in Session 3.
+- **`reading_state`** — one row per book read on a KOReader device (mirrored
+  from its `.sdr` sidecars): `percent` (0..1), `pages` (total pages of the device
+  rendering, 0 = unknown; migration `0004`), `status`
+  (reading/complete/abandoned/new), `device`, `last_read_at` (KOReader's
+  `summary.modified`, verbatim) and `synced_at` (RFC3339). Primary key `book_id`.
+  Indexed by `status` (sidebar reading filters).
+- **`annotation`** — highlights and notes imported from KOReader: `text`,
+  `note`, `chapter`, `drawer` (highlight style), `created_at` (device datetime)
+  and a `dedup_key` with `UNIQUE (book_id, dedup_key)` so a re-sync is
+  idempotent. Indexed by `book_id`. Added in migration `0003`.
 - **`schema_version`** — bookkeeping for the migration runner (see below).
 
-Deleting a book cascades to `book_author`, `book_tag` and `file` (via
-`ON DELETE CASCADE`); its `book_fts` row is removed explicitly in the same
-transaction. Deleting a series sets dependent `book.series_id` to NULL.
+Deleting a book cascades to `book_author`, `book_tag`, `file`, `reading_state`
+and `annotation` (via `ON DELETE CASCADE`); its `book_fts` row is removed
+explicitly in the same transaction. Deleting a series sets dependent
+`book.series_id` to NULL.
 
 ### Sorting conventions
 

@@ -44,3 +44,14 @@ export function SetEnabled(enabled: boolean): $CancellablePromise<$models.Calibr
 export function Status(): $CancellablePromise<$models.CalibreStatus> {
     return $Call.ByID(4218957489);
 }
+
+/**
+ * SyncReadingFromDevice pulls KOReader reading progress and annotations over the
+ * live Calibre connection — no USB needed. For every book Reliure has sent (per
+ * the `.reliure` inventory) it requests the book's `.sdr` sidecar by lpath via
+ * GET_BOOK_FILE_SEGMENT, parses it and stores progress + annotations. The
+ * inventory maps each lpath to a book id, so matching is exact.
+ */
+export function SyncReadingFromDevice(): $CancellablePromise<$models.KoreaderSyncResult> {
+    return $Call.ByID(1527324102);
+}

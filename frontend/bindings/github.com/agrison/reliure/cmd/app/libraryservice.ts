@@ -71,6 +71,14 @@ export function BooksByAuthor(id: number): $CancellablePromise<$models.BookCard[
 }
 
 /**
+ * BooksByReadingStatus returns books in a given KOReader reading status
+ * ("reading", "complete", "abandoned").
+ */
+export function BooksByReadingStatus(status: string): $CancellablePromise<$models.BookCard[] | null> {
+    return $Call.ByID(1406624309, status);
+}
+
+/**
  * BooksBySeries returns a series' books, in reading order.
  */
 export function BooksBySeries(id: number): $CancellablePromise<$models.BookCard[] | null> {

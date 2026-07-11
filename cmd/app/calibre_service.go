@@ -13,6 +13,7 @@ import (
 	"github.com/agrison/reliure/internal/calibre"
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/device"
+	"github.com/agrison/reliure/internal/koreader"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -216,6 +217,111 @@ func (s *CalibreService) SendBooks(ids []int64) (SendResult, error) {
 	}
 	slog.Info("calibre: send finished", "sent", res.Sent, "failed", res.Failed, "device", deviceName)
 	return res, nil
+}
+
+// SyncReadingFromDevice pulls KOReader reading progress and annotations over the
+// live Calibre connection — no USB needed. For every book Reliure has sent (per
+// the `.reliure` inventory) it requests the book's `.sdr` sidecar by lpath via
+// GET_BOOK_FILE_SEGMENT, parses it and stores progress + annotations. The
+// inventory maps each lpath to a book id, so matching is exact.
+func (s *CalibreService) SyncReadingFromDevice() (KoreaderSyncResult, error) {
+	var res KoreaderSyncResult
+	sess := s.server.Session()
+	if sess == nil {
+		return res, errors.New("aucune liseuse connectée")
+	}
+	deviceName, _ := s.server.Device()
+	res.Dir = deviceName
+	if s.inventory == nil {
+		return res, errors.New("inventaire liseuse indisponible")
+	}
+	inv, err := s.inventory.Load(deviceName)
+	if err != nil {
+		return res, err
+	}
+
+	for _, e := range inv.Entries {
+		data, ok := s.fetchSidecar(sess, e)
+		if !ok {
+			res.Unmatched++ // on the device but not opened/read yet
+			continue
+		}
+		res.Scanned++
+		sc, err := koreader.Parse(data)
+		if err != nil {
+			slog.Warn("calibre: parse sidecar failed", "book", e.BookID, "err", err)
+			continue
+		}
+		if err := s.applyDeviceReading(e.BookID, deviceName, sc, &res); err != nil {
+			return res, err
+		}
+	}
+	slog.Info("calibre: reading sync from device", "device", deviceName,
+		"read", res.Scanned, "annotations", res.Annotations, "unread", res.Unmatched)
+	return res, nil
+}
+
+// fetchSidecar tries the KOReader sidecar path(s) for a sent book and returns
+// the first that exists on the device.
+func (s *CalibreService) fetchSidecar(sess *calibre.Session, e device.Entry) ([]byte, bool) {
+	for _, lp := range sidecarLpaths(e.RemotePath, e.Format) {
+		data, ok, err := sess.GetFile(lp)
+		if err != nil {
+			slog.Warn("calibre: get sidecar failed", "lpath", lp, "err", err)
+			continue
+		}
+		if ok {
+			return data, true
+		}
+	}
+	return nil, false
+}
+
+func (s *CalibreService) applyDeviceReading(bookID int64, deviceName string, sc *koreader.Sidecar, res *KoreaderSyncResult) error {
+	if err := s.db.Reading.UpsertState(core.ReadingState{
+		BookID:     bookID,
+		Percent:    sc.PercentFinished,
+		Pages:      sc.TotalPages,
+		Status:     string(sc.Status),
+		Device:     deviceName,
+		LastReadAt: sc.ModifiedAt,
+	}); err != nil {
+		return err
+	}
+	res.Matched++
+	if sc.PercentFinished > 0 || sc.Status != "" {
+		res.WithProgress++
+	}
+	anns := make([]core.Annotation, 0, len(sc.Annotations))
+	for _, a := range sc.Annotations {
+		anns = append(anns, core.Annotation{
+			BookID: bookID, Text: a.Text, Note: a.Note,
+			Chapter: a.Chapter, Drawer: a.Drawer, CreatedAt: a.Datetime,
+		})
+	}
+	if err := s.db.Reading.ReplaceAnnotations(bookID, anns); err != nil {
+		return err
+	}
+	res.Annotations += len(anns)
+	return nil
+}
+
+// sidecarLpaths builds the candidate KOReader sidecar paths for a book's remote
+// path. KOReader's default (getSidecarDir) strips the extension — "Book.epub" →
+// "Book.sdr/metadata.epub.lua"; the extension-kept form is tried as a fallback.
+func sidecarLpaths(remotePath, format string) []string {
+	rp := filepath.ToSlash(remotePath)
+	ext := path.Ext(rp)
+	format = strings.ToLower(strings.TrimPrefix(format, "."))
+	if format == "" {
+		format = strings.TrimPrefix(strings.ToLower(ext), ".")
+	}
+	meta := "metadata." + format + ".lua"
+	stem := strings.TrimSuffix(rp, ext)
+	return []string{
+		stem + ".sdr/" + meta, // extension stripped (KOReader default)
+		rp + ".sdr/" + meta,   // extension kept (older/alternate layouts)
+	}
 }
 
 func (s *CalibreService) updateAndSendInventory(sess *calibre.Session, deviceName string, entries []device.Entry) error {

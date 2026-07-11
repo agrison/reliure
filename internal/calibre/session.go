@@ -157,6 +157,55 @@ func (s *Session) SendFile(filePath, lpath string, metadata map[string]any, this
 	return lpath, nil
 }
 
+// maxFileFetch caps a GetFile response so a misbehaving device can't exhaust
+// memory. Sidecars are a few KB; even reading stats stay well under this.
+const maxFileFetch = 16 << 20
+
+// GetFile fetches the file at lpath from the device with GET_BOOK_FILE_SEGMENT.
+// KOReader resolves lpath by direct concatenation under its inbox, so this reads
+// any file — including `.sdr` sidecars — not only known books. The device replies
+// with OK{fileLength} followed by exactly that many raw bytes, or a NOOP when the
+// file is absent (found=false). It never blocks: a missing file is a clean reply.
+func (s *Session) GetFile(lpath string) ([]byte, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	reply, err := s.call(OpGetBookFileSegment, map[string]any{
+		"lpath":           lpath,
+		"position":        0,
+		"thisBook":        0,
+		"totalBooks":      1,
+		"canStream":       true,
+		"canStreamBinary": true,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	switch reply.Op {
+	case OpNoop:
+		return nil, false, nil // file not present on the device
+	case OpOK:
+		n := 0
+		if v, ok := reply.Payload["fileLength"].(float64); ok {
+			n = int(v)
+		}
+		if n <= 0 {
+			return nil, false, nil
+		}
+		if n > maxFileFetch {
+			// Drain the stream so the socket stays aligned for the next command.
+			_, _ = io.CopyN(io.Discard, s.r, int64(n))
+			return nil, false, fmt.Errorf("calibre: file %q too large (%d bytes)", lpath, n)
+		}
+		buf := make([]byte, n)
+		if _, err := io.ReadFull(s.r, buf); err != nil {
+			return nil, false, err
+		}
+		return buf, true, nil
+	default:
+		return nil, false, fmt.Errorf("calibre: unexpected reply opcode %d to GET_BOOK_FILE_SEGMENT", reply.Op)
+	}
+}
+
 // Noop sends a keep-alive and reads the reply, keeping the connection warm.
 func (s *Session) Noop() error {
 	s.mu.Lock()

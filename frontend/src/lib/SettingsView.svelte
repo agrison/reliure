@@ -14,6 +14,10 @@
     onSetWriteMetadataToFile,
     onRegenerateCovers,
     onSetTheme,
+    onChooseKoreader,
+    onSyncKoreader,
+    onSyncKoreaderFromDevice,
+    syncingKoreader,
   }: {
     settings: AppSettings;
     opdsStatus: OPDSStatus;
@@ -27,6 +31,10 @@
     onSetWriteMetadataToFile: (enabled: boolean) => void;
     onRegenerateCovers: () => Promise<void> | void;
     onSetTheme: (theme: "system" | "light" | "dark") => void;
+    onChooseKoreader: () => Promise<void> | void;
+    onSyncKoreader: () => Promise<void> | void;
+    onSyncKoreaderFromDevice: () => Promise<void> | void;
+    syncingKoreader: boolean;
   } = $props();
 
   const themes: { value: "system" | "light" | "dark"; label: string }[] = [
@@ -251,6 +259,40 @@
         <button class="action" onclick={regenerate} disabled={regenerating}>
           {regenerating ? "Génération…" : "Régénérer les vignettes"}
         </button>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Lecture (KOReader)</h3>
+            <p>Importe la progression, le statut et les surlignages depuis les fichiers <code>.sdr</code> de la liseuse.</p>
+          </div>
+        </div>
+
+        <div class="subhead">Depuis la liseuse connectée (WiFi)</div>
+        {#if calibre?.connected}
+          <button class="action" onclick={onSyncKoreaderFromDevice} disabled={syncingKoreader}>
+            {syncingKoreader ? "Synchronisation…" : `Synchroniser depuis ${calibre.device || "la liseuse"}`}
+          </button>
+        {:else}
+          <button class="action" disabled>Aucune liseuse connectée</button>
+          <p class="hint">Ouvrez « Calibre » dans KOReader et connectez-vous au serveur (section Réseau ci-dessus), puis revenez ici.</p>
+        {/if}
+
+        <div class="subhead">Depuis un dossier (USB / synchronisé)</div>
+        {#if settings.koreaderSyncDir}
+          <div class="path-row"><span class="path ellipsis" title={settings.koreaderSyncDir}>{settings.koreaderSyncDir}</span></div>
+        {/if}
+        <div class="btnrow">
+          <button class="action" onclick={onChooseKoreader} disabled={syncingKoreader}>
+            {syncingKoreader ? "Synchronisation…" : settings.koreaderSyncDir ? "Changer de dossier…" : "Choisir un dossier…"}
+          </button>
+          {#if settings.koreaderSyncDir}
+            <button class="action ghost" onclick={onSyncKoreader} disabled={syncingKoreader}>
+              {syncingKoreader ? "…" : "Resynchroniser"}
+            </button>
+          {/if}
+        </div>
       </article>
     </div>
   </section>
@@ -501,6 +543,31 @@
   .action:disabled {
     cursor: default;
     opacity: 0.6;
+  }
+  .subhead {
+    margin-top: 1rem;
+    margin-bottom: 0.15rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+  }
+  .subhead:first-of-type {
+    margin-top: 0.5rem;
+  }
+  .btnrow {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+  }
+  .btnrow .action {
+    flex: 1;
+    width: auto;
+  }
+  .action.ghost {
+    flex: none;
+    background: transparent;
+    color: var(--muted);
   }
 
   @media (max-width: 820px) {

@@ -24,6 +24,7 @@ type DB struct {
 	Authors *AuthorRepo
 	Series  *SeriesRepo
 	Tags    *TagRepo
+	Reading *ReadingRepo
 }
 
 // Open opens (or creates) the database at path, applies pending migrations and
@@ -60,6 +61,7 @@ func Open(path string) (*DB, error) {
 	db.Authors = &AuthorRepo{db: sqldb}
 	db.Series = &SeriesRepo{db: sqldb}
 	db.Tags = &TagRepo{db: sqldb}
+	db.Reading = &ReadingRepo{db: sqldb}
 	return db, nil
 }
 

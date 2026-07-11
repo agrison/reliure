@@ -6,6 +6,7 @@
     OPDSService,
     CalibreService,
     SettingsService,
+    KOReaderService,
     type BookCard,
     type BookDetail,
     type QuickEditRow,
@@ -15,6 +16,9 @@
     type OPDSStatus,
     type CalibreStatus,
     type DeviceBookState,
+    type ReadingCard,
+    type ReadingStatusCounts,
+    type KoreaderSyncResult,
     type CalibreSendProgress,
     type ImportProgress,
     type ImportSummary,
@@ -27,6 +31,7 @@
   import BookDetailView from "./lib/BookDetail.svelte";
   import MetadataMatch from "./lib/MetadataMatch.svelte";
   import Discover from "./lib/Discover.svelte";
+  import Annotations from "./lib/Annotations.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import type { ApplyMetadataInput } from "./lib/api";
 
@@ -59,6 +64,10 @@
   let opdsStatus = $state<OPDSStatus | null>(null);
   let calibre = $state<CalibreStatus | null>(null);
   let deviceStates = $state<Record<number, DeviceBookState>>({});
+  let readingStates = $state<Record<number, ReadingCard>>({});
+  let readingCounts = $state<ReadingStatusCounts | null>(null);
+  let annotationTotal = $state(0);
+  let syncingKoreader = $state(false);
   let sending = $state(false);
 
   let importing = $state(false);
@@ -72,6 +81,7 @@
       const q = query.trim();
       let res: BookCard[] | null;
       if (q) res = await LibraryService.Search(q);
+      else if (view.kind === "reading") res = await LibraryService.BooksByReadingStatus(view.status);
       else if (view.kind === "author") res = view.id === 0 ? await LibraryService.BooksWithoutAuthor() : await LibraryService.BooksByAuthor(view.id);
       else if (view.kind === "series") res = view.id === 0 ? await LibraryService.BooksWithoutSeries() : await LibraryService.BooksBySeries(view.id);
       else if (view.kind === "tag") res = view.id === 0 ? await LibraryService.BooksWithoutTag() : await LibraryService.BooksByTag(view.id);
@@ -98,6 +108,96 @@
     } catch (e) {
       console.error("[Reliure] Device inventory failed", e);
       deviceStates = {};
+    }
+  }
+
+  async function loadReadingStates() {
+    try {
+      const [cards, counts] = await Promise.all([
+        KOReaderService.ReadingStates(),
+        KOReaderService.StatusCounts(),
+      ]);
+      const next: Record<number, ReadingCard> = {};
+      let anns = 0;
+      for (const c of cards ?? []) {
+        next[c.bookId] = c;
+        anns += c.annotations;
+      }
+      readingStates = next;
+      annotationTotal = anns;
+      readingCounts = counts;
+      // If the active view no longer has any books (e.g. all "reading" became
+      // "complete"), fall back to the full library.
+      if (view.kind === "reading" && (counts as any)[view.status] === 0) {
+        selectView({ kind: "all" });
+      } else if (view.kind === "annotations" && anns === 0) {
+        selectView({ kind: "all" });
+      }
+    } catch (e) {
+      console.error("[Reliure] ReadingStates failed", e);
+    }
+  }
+
+  function syncSummary(res: KoreaderSyncResult): string {
+    if (res.scanned === 0) return "Aucun sidecar KOReader trouvé dans ce dossier";
+    return (
+      `${res.matched} livre${res.matched === 1 ? "" : "s"} synchronisé${res.matched === 1 ? "" : "s"}` +
+      (res.annotations ? ` · ${res.annotations} surlignage${res.annotations === 1 ? "" : "s"}` : "") +
+      (res.unmatched ? ` · ${res.unmatched} non rattaché${res.unmatched === 1 ? "" : "s"}` : "")
+    );
+  }
+
+  async function chooseKoreaderAndSync() {
+    if (syncingKoreader) return;
+    syncingKoreader = true;
+    try {
+      const res = await KOReaderService.ChooseFolderAndSync();
+      if (!res.dir) return; // dialog cancelled
+      settings = await SettingsService.Get();
+      toast = syncSummary(res);
+      setTimeout(() => (toast = ""), 7000);
+      await Promise.all([loadReadingStates(), loadBooks()]);
+    } catch (e) {
+      toast = `Synchronisation impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    } finally {
+      syncingKoreader = false;
+    }
+  }
+
+  async function syncKoreader() {
+    if (syncingKoreader) return;
+    syncingKoreader = true;
+    try {
+      const res = await KOReaderService.Sync();
+      toast = syncSummary(res);
+      setTimeout(() => (toast = ""), 7000);
+      await Promise.all([loadReadingStates(), loadBooks()]);
+    } catch (e) {
+      toast = `Synchronisation impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    } finally {
+      syncingKoreader = false;
+    }
+  }
+
+  // Pull reading progress + highlights over the live Calibre WiFi connection —
+  // no USB. Reads each sent book's .sdr sidecar from the device by lpath.
+  async function syncKoreaderFromDevice() {
+    if (syncingKoreader) return;
+    syncingKoreader = true;
+    try {
+      const res = await CalibreService.SyncReadingFromDevice();
+      toast =
+        `${res.matched} livre${res.matched === 1 ? "" : "s"} synchronisé${res.matched === 1 ? "" : "s"} depuis la liseuse` +
+        (res.annotations ? ` · ${res.annotations} surlignage${res.annotations === 1 ? "" : "s"}` : "");
+      setTimeout(() => (toast = ""), 7000);
+      await Promise.all([loadReadingStates(), loadBooks()]);
+    } catch (e) {
+      toast = `Synchronisation impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    } finally {
+      syncingKoreader = false;
     }
   }
 
@@ -128,8 +228,8 @@
     clearSelection();
     if (v.kind === "quickedit") loadQuickEdit();
     else if (v.kind === "settings") loadSettings();
-    else if (v.kind === "gutenberg") {
-      /* the Discover view loads its own catalogue data */
+    else if (v.kind === "gutenberg" || v.kind === "annotations") {
+      /* Discover and Annotations load their own data */
     } else loadBooks();
   }
 
@@ -419,6 +519,7 @@
   onMount(() => {
     loadSidebar();
     loadBooks();
+    loadReadingStates();
     OPDSService.Status().then((s) => (opdsStatus = s)).catch(() => {});
     CalibreService.Status().then((s) => {
       calibre = s;
@@ -497,6 +598,8 @@
     {tags}
     opds={opdsStatus}
     {calibre}
+    reading={readingCounts}
+    annotationCount={annotationTotal}
     active={view}
     onSelect={selectView}
     onOpenSettings={openSettings}
@@ -514,12 +617,12 @@
           </button>
         {/if}
         <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? "Auteurs" : browseMode === "series" ? "Séries" : "Tags"}</h1>
-        {#if view.kind !== "settings" && view.kind !== "gutenberg"}
+        {#if view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations"}
           <span class="n">{visibleCount}</span>
         {/if}
       </div>
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations"}
         <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path
@@ -555,7 +658,7 @@
         </div>
       {/if}
 
-      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg"}
+      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations"}
         <div class="viewtoggle" role="group" aria-label="Affichage">
           <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
@@ -566,7 +669,7 @@
         </div>
       {/if}
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations"}
         <button class="import" onclick={doImport} disabled={importing}>
           {importing ? "Import…" : "Importer"}
         </button>
@@ -611,12 +714,18 @@
             onSetWriteMetadataToFile={setWriteMetadataToFile}
             onRegenerateCovers={regenerateCovers}
             onSetTheme={setTheme}
+            onChooseKoreader={chooseKoreaderAndSync}
+            onSyncKoreader={syncKoreader}
+            onSyncKoreaderFromDevice={syncKoreaderFromDevice}
+            {syncingKoreader}
           />
         {:else}
           <p class="state">Chargement…</p>
         {/if}
       {:else if view.kind === "gutenberg"}
         <Discover />
+      {:else if view.kind === "annotations"}
+        <Annotations onOpen={openBook} />
       {:else if view.kind === "quickedit"}
         {#if quickLoading}
           <p class="state">Chargement…</p>
@@ -650,7 +759,7 @@
           {/if}
         </div>
       {:else}
-        <BookGrid {books} mode={viewMode} {selectedIds} {deviceStates} onOpen={openBook} onToggleSelect={toggleSelect} />
+        <BookGrid {books} mode={viewMode} {selectedIds} {deviceStates} {readingStates} onOpen={openBook} onToggleSelect={toggleSelect} />
       {/if}
     </div>
   </main>

@@ -123,6 +123,24 @@ frontend/       Svelte + Vite UI, embedded into the binary
   `internal/core`/`internal/library`; the app layer downloads the EPUB to a temp
   file and feeds it to the normal import pipeline (forced copy mode).
 
+- **`internal/koreader`** — reads KOReader's per-book `.sdr` sidecars
+  (`metadata.<ext>.lua`) to recover reading progress, status and annotations
+  (highlights + notes). The sidecar is a Lua `return { ... }` table, evaluated
+  with a sandboxed `gopher-lua` state — no standard library is opened and a
+  deadline guards evaluation, so a sidecar is treated as pure data, never code.
+  Both the modern unified `annotations` array and the legacy
+  `highlight`/`bookmarks` layout are understood. `Scan` walks a folder (USB /
+  synced copy); `Parse` handles bytes fetched over the wire. The app layer
+  matches each sidecar to a library book.
+
+  Sidecars can also be read **over the live Calibre WiFi connection** — no USB.
+  KOReader's plugin implements `GET_BOOK_FILE_SEGMENT` and resolves the requested
+  `lpath` by plain concatenation under its inbox (no book-DB lookup), so
+  `Session.GetFile` reads any file — including a book's `.sdr/metadata.<ext>.lua`.
+  `CalibreService.SyncReadingFromDevice` walks the `.reliure` inventory (which
+  maps each `lpath` → book id, giving exact matching), fetches each sidecar and
+  stores progress + annotations. Missing files reply NOOP, so it never blocks.
+
 - **`cmd/app`** — the desktop shell. Creates the Wails application, registers Go
   *services* whose public methods are callable from JS, and opens the main
   window. It stays deliberately thin: it wires `internal/*` to the UI and holds
@@ -142,6 +160,11 @@ frontend/       Svelte + Vite UI, embedded into the binary
   optional downloaded cover. `SearchGutenberg`/`ImportGutenbergBook` back the
   "Découvrir" view: browse Project Gutenberg and add a book's EPUB (downloaded to
   a temp file, then run through the shared import core in copy mode).
+  `KOReaderService` mirrors reading progress and annotations from a KOReader
+  library folder (`ChooseFolderAndSync`/`Sync`): it scans `.sdr` sidecars via
+  `internal/koreader`, matches each to a book (title+author, then file basename,
+  then a unique title), and upserts `reading_state` + `annotation`;
+  `ReadingStates` feeds the grid's progress bars and annotation badges.
   `SettingsService`
   reads/writes preferences. `OPDSService` starts, stops and reports the local
   pull catalog URL. `CalibreService` controls the push server, sends books,

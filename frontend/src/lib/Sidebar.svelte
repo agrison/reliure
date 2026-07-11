@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { SidebarItem, OPDSStatus, CalibreStatus } from "./api";
-  import type { View } from "./types";
+  import type { SidebarItem, OPDSStatus, CalibreStatus, ReadingStatusCounts } from "./api";
+  import type { View, ReadingStatus } from "./types";
 
   let {
     total,
@@ -9,6 +9,8 @@
     tags,
     opds,
     calibre,
+    reading,
+    annotationCount,
     active,
     onSelect,
     onOpenSettings,
@@ -19,10 +21,24 @@
     tags: SidebarItem[];
     opds: OPDSStatus | null;
     calibre: CalibreStatus | null;
+    reading: ReadingStatusCounts | null;
+    annotationCount: number;
     active: View;
     onSelect: (v: View) => void;
     onOpenSettings: () => void;
   } = $props();
+
+  // Reading-status filters shown only when they contain at least one book, so an
+  // unsynced library stays clean (and "Abandonnés" only appears when relevant).
+  const readingFilters = $derived(
+    (
+      [
+        { status: "reading", label: "En cours", count: reading?.reading ?? 0 },
+        { status: "complete", label: "Terminés", count: reading?.complete ?? 0 },
+        { status: "abandoned", label: "Abandonnés", count: reading?.abandoned ?? 0 },
+      ] as { status: ReadingStatus; label: string; count: number }[]
+    ).filter((f) => f.count > 0),
+  );
 
   // "http://192.168.1.10:8080/" → "192.168.1.10:8080" for a compact status line.
   function shortURL(url: string): string {
@@ -55,6 +71,22 @@
     <span class="count">{total}</span>
   </button>
 
+  {#if readingFilters.length}
+    <div class="statusrow">
+      {#each readingFilters as f (f.status)}
+        <button
+          class="status"
+          class:active={active.kind === "reading" && active.status === f.status}
+          onclick={() => onSelect({ kind: "reading", status: f.status })}
+        >
+          <span class="dot {f.status}"></span>
+          <span class="ellipsis">{f.label}</span>
+          <span class="count">{f.count}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
   <button class="root tool" class:active={active.kind === "quickedit"} onclick={() => onSelect({ kind: "quickedit" })}>
     <span>Édition rapide</span>
   </button>
@@ -65,6 +97,17 @@
     </svg>
     <span>Découvrir</span>
   </button>
+
+  {#if annotationCount > 0}
+    <button class="root tool" class:active={active.kind === "annotations"} onclick={() => onSelect({ kind: "annotations" })}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
+        <path d="M4 19.5V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v9l-6 6H5a1 1 0 0 1-1-1z M14 20v-5a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M8 9h8M8 12.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span>Annotations</span>
+      <span class="count">{annotationCount}</span>
+    </button>
+  {/if}
 
   <nav class="groups">
     {#each groups as g (g.key)}
@@ -208,6 +251,48 @@
   .item.active {
     background: color-mix(in srgb, var(--accent) 20%, transparent);
     color: var(--text);
+  }
+
+  .statusrow {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 0.4rem;
+  }
+  .status {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    text-align: left;
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .status:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .status.active {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--text);
+  }
+  .status .dot {
+    flex: none;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--faint);
+  }
+  .status .dot.reading {
+    background: var(--accent);
+  }
+  .status .dot.complete {
+    background: var(--ok);
+  }
+  .status .dot.abandoned {
+    background: var(--faint);
   }
 
   .groups {

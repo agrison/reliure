@@ -312,6 +312,21 @@ func (r *BookRepo) ListByTag(tagID int64) ([]*Book, error) {
 	return books, r.hydrate(books)
 }
 
+// ListByReadingStatus returns the books with the given KOReader reading status,
+// most recently read first.
+func (r *BookRepo) ListByReadingStatus(status string) ([]*Book, error) {
+	q := `SELECT ` + bookCols + ` FROM book b
+	      JOIN reading_state rs ON rs.book_id = b.id
+	      WHERE rs.status = ?
+	      ORDER BY rs.last_read_at DESC, ` +
+		`(CASE WHEN b.title_sort='' THEN b.title ELSE b.title_sort END) COLLATE NOCASE`
+	books, err := r.scanBooks(q, status)
+	if err != nil {
+		return nil, err
+	}
+	return books, r.hydrate(books)
+}
+
 // ListWithoutTags returns books that carry no tag.
 func (r *BookRepo) ListWithoutTags() ([]*Book, error) {
 	q := `SELECT ` + bookCols + ` FROM book b
