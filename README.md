@@ -27,6 +27,8 @@ Prebuilt releases are available from the
 
 | Feature | Screenshot |
 | --- | --- |
+| Library | <img src="screenshots/home.png" alt="Currently reading" width="520"> |
+| Library (as list) | <img src="screenshots/home_list.png" alt="Currently reading" width="520"> |
 | Currently reading | <img src="screenshots/currently_reading.png" alt="Currently reading" width="520"> |
 | KOReader currently reading sync | <img src="screenshots/currently_reading_koreader.png" alt="KOReader currently reading sync" width="520"> |
 | KOReader reading details | <img src="screenshots/currently_reading_koreader_details.png" alt="KOReader reading details" width="520"> |
