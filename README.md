@@ -8,8 +8,11 @@ KOReader and want a fast, clean way to organise, enrich and send books to their
 device.
 
 It focuses on the everyday workflow around a personal library: importing books,
-fixing metadata, browsing covers, tracking what is already on the reader, and
-moving files to KOReader with the right folder structure.
+fixing metadata, browsing covers, integrating with KOReader by tracking what is 
+already on the reader, and moving files there with the right folder structure.
+
+I need it for my personal use, and my LLM friend is kind enough to help me build it,
+but I thought maybe others would be interested.
 
 ## Downloads
 
