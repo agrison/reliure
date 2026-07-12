@@ -26,10 +26,13 @@
     type CalibreSendProgress,
     type ImportProgress,
     type ImportSummary,
+    type ContentSnippet,
   } from "./lib/api";
   import { type View, viewTitle } from "./lib/types";
   import Sidebar from "./lib/Sidebar.svelte";
   import BookGrid from "./lib/BookGrid.svelte";
+  import ContentResults from "./lib/ContentResults.svelte";
+  import ContentOccurrences from "./lib/ContentOccurrences.svelte";
   import GroupGrid from "./lib/GroupGrid.svelte";
   import QuickEditTable from "./lib/QuickEditTable.svelte";
   import BookDetailView from "./lib/BookDetail.svelte";
@@ -39,6 +42,7 @@
   import Dashboard from "./lib/Dashboard.svelte";
   import SmartShelves from "./lib/SmartShelves.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
+  import { plural, setDocumentLocale, t, type Locale } from "./lib/i18n";
   import type { ApplyMetadataInput, ReadingUpdate } from "./lib/api";
 
   let view = $state<View>({ kind: "all" });
@@ -48,6 +52,7 @@
   let viewMode = $state<"grid" | "list">("grid");
   let query = $state("");
   let books = $state<BookCard[]>([]);
+  let contentSnippets = $state<ContentSnippet[]>([]);
   let quickRows = $state<QuickEditRow[]>([]);
   let quickLoading = $state(false);
   let quickSaving = $state(false);
@@ -83,18 +88,35 @@
   let toast = $state("");
   let dragOver = $state(false);
 
+  function countParams(count: number) {
+    return { count, s: plural(count) };
+  }
+
+  function msg(key: Parameters<typeof t>[0], params?: Parameters<typeof t>[2]): string {
+    return t(key, undefined, params);
+  }
+
   async function loadBooks() {
     loading = true;
     try {
       const q = query.trim();
       let res: BookCard[] | null;
-      if (q) res = await LibraryService.Search(q);
+      if (q) {
+        const scope = searchScope();
+        const [bookRes, snippetRes] = await Promise.all([
+          LibraryService.SearchScoped(q, scope),
+          settings?.contentSearchEnabled ? LibraryService.ContentSnippets(q, scope, 20, 4) : Promise.resolve([]),
+        ]);
+        res = bookRes;
+        contentSnippets = snippetRes ?? [];
+      }
       else if (view.kind === "shelf") res = await LibraryService.BooksBySmartShelf(view.id);
       else if (view.kind === "reading") res = await LibraryService.BooksByReadingStatus(view.status);
       else if (view.kind === "author") res = view.id === 0 ? await LibraryService.BooksWithoutAuthor() : await LibraryService.BooksByAuthor(view.id);
       else if (view.kind === "series") res = view.id === 0 ? await LibraryService.BooksWithoutSeries() : await LibraryService.BooksBySeries(view.id);
       else if (view.kind === "tag") res = view.id === 0 ? await LibraryService.BooksWithoutTag() : await LibraryService.BooksByTag(view.id);
       else res = await LibraryService.Books(sort);
+      if (!q) contentSnippets = [];
       books = res ?? [];
       const visible = new Set(books.map((b) => b.id));
       selectedIds = selectedIds.filter((id) => visible.has(id));
@@ -102,6 +124,32 @@
     } finally {
       loading = false;
     }
+  }
+
+  function searchScope() {
+    if (detail) return { kind: "book", id: detail.id };
+    if (view.kind === "author" || view.kind === "series" || view.kind === "tag") {
+      return { kind: view.kind, id: view.id };
+    }
+    return { kind: "all", id: 0 };
+  }
+
+  function openContentOccurrences() {
+    const q = query.trim();
+    if (!q) return;
+    view = {
+      kind: "contentOccurrences",
+      query: q,
+      scope: searchScope(),
+      title: viewTitle(view),
+    };
+  }
+
+  function closeContentOccurrences() {
+    view = { kind: "all" };
+    browseMode = "books";
+    parentBrowseMode = null;
+    loadBooks();
   }
 
   async function refreshDeviceStates(source = books) {
@@ -148,11 +196,11 @@
   }
 
   function syncSummary(res: KoreaderSyncResult): string {
-    if (res.scanned === 0) return "Aucun sidecar KOReader trouvé dans ce dossier";
+    if (res.scanned === 0) return msg("toast.koreader.noSidecar");
     return (
-      `${res.matched} livre${res.matched === 1 ? "" : "s"} synchronisé${res.matched === 1 ? "" : "s"}` +
-      (res.annotations ? ` · ${res.annotations} surlignage${res.annotations === 1 ? "" : "s"}` : "") +
-      (res.unmatched ? ` · ${res.unmatched} non rattaché${res.unmatched === 1 ? "" : "s"}` : "")
+      msg("toast.koreader.synced", countParams(res.matched)) +
+      (res.annotations ? ` · ${msg("toast.koreader.annotations", countParams(res.annotations))}` : "") +
+      (res.unmatched ? ` · ${msg("toast.koreader.unmatched", countParams(res.unmatched))}` : "")
     );
   }
 
@@ -167,7 +215,7 @@
       setTimeout(() => (toast = ""), 7000);
       await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
-      toast = `Synchronisation impossible · ${errorMessage(e)}`;
+      toast = msg("toast.syncFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     } finally {
       syncingKoreader = false;
@@ -183,7 +231,7 @@
       setTimeout(() => (toast = ""), 7000);
       await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
-      toast = `Synchronisation impossible · ${errorMessage(e)}`;
+      toast = msg("toast.syncFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     } finally {
       syncingKoreader = false;
@@ -198,12 +246,12 @@
     try {
       const res = await CalibreService.SyncReadingFromDevice();
       toast =
-        `${res.matched} livre${res.matched === 1 ? "" : "s"} synchronisé${res.matched === 1 ? "" : "s"} depuis la liseuse` +
-        (res.annotations ? ` · ${res.annotations} surlignage${res.annotations === 1 ? "" : "s"}` : "");
+        msg("toast.koreader.syncedFromReader", countParams(res.matched)) +
+        (res.annotations ? ` · ${msg("toast.koreader.annotations", countParams(res.annotations))}` : "");
       setTimeout(() => (toast = ""), 7000);
       await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
     } catch (e) {
-      toast = `Synchronisation impossible · ${errorMessage(e)}`;
+      toast = msg("toast.syncFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     } finally {
       syncingKoreader = false;
@@ -256,7 +304,7 @@
 
   async function saveSmartShelf(input: SmartShelfInput): Promise<SmartShelfDetail> {
     const saved = await LibraryService.SaveSmartShelf(input);
-    toast = `Étagère « ${saved.name} » enregistrée`;
+    toast = msg("toast.shelfSaved", { name: saved.name });
     setTimeout(() => (toast = ""), 4000);
     await loadSmartShelves();
     if (view.kind === "shelf" && view.id === saved.id) {
@@ -268,7 +316,7 @@
 
   async function deleteSmartShelf(id: number) {
     await LibraryService.DeleteSmartShelf(id);
-    toast = "Étagère supprimée";
+    toast = msg("toast.shelfDeleted");
     setTimeout(() => (toast = ""), 4000);
     await loadSmartShelves();
     if (view.kind === "shelf" && view.id === id) {
@@ -283,6 +331,7 @@
       CalibreService.Status(),
     ]);
     settings = nextSettings;
+    setDocumentLocale(nextSettings.language);
     opdsStatus = nextOPDS;
     calibre = nextCalibre;
   }
@@ -301,8 +350,8 @@
     try {
       const res = await LibraryService.SaveQuickEdits(rows);
       toast =
-        `${res.updated} ligne${res.updated === 1 ? "" : "s"} sauvegardée${res.updated === 1 ? "" : "s"}` +
-        (res.failed ? ` · ${res.failed} échec${res.failed === 1 ? "" : "s"}` : "");
+        msg("toast.quickSaved", countParams(res.updated)) +
+        (res.failed ? ` · ${msg("toast.failures", countParams(res.failed))}` : "");
       setTimeout(() => (toast = ""), 6000);
       await Promise.all([loadSidebar(), loadBooks()]);
       return res;
@@ -368,13 +417,13 @@
       detail = null;
       toast =
         res.trashedFiles > 0
-          ? `Livre retiré · ${res.trashedFiles} fichier${res.trashedFiles === 1 ? "" : "s"} déplacé${res.trashedFiles === 1 ? "" : "s"} dans la corbeille`
-          : "Livre retiré de l’index";
+          ? msg("toast.bookRemovedFiles", countParams(res.trashedFiles))
+          : msg("toast.bookRemovedIndex");
       setTimeout(() => (toast = ""), 6000);
       await Promise.all([loadSidebar(), loadBooks()]);
     } catch (e) {
       console.error("[Reliure] RemoveBook failed", e);
-      toast = `Suppression impossible · ${errorMessage(e)}`;
+      toast = msg("toast.removeFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     }
   }
@@ -382,12 +431,12 @@
   async function saveBook(update: Parameters<typeof LibraryService.UpdateBook>[0]) {
     try {
       detail = await LibraryService.UpdateBook(update);
-      toast = "Métadonnées enregistrées";
+      toast = msg("toast.metadataSaved");
       setTimeout(() => (toast = ""), 4000);
       await Promise.all([loadSidebar(), loadBooks()]);
     } catch (e) {
       console.error("[Reliure] UpdateBook failed", e);
-      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      toast = msg("toast.saveFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
       throw e;
     }
@@ -399,7 +448,7 @@
       detail = await LibraryService.SetTitleSort(detail.id, sort);
       await Promise.all([loadSidebar(), loadBooks()]);
     } catch (e) {
-      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      toast = msg("toast.saveFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     }
   }
@@ -409,7 +458,7 @@
       detail = await LibraryService.SetAuthorSort(detail.id, authorId, sort);
       await Promise.all([loadSidebar(), loadBooks()]);
     } catch (e) {
-      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      toast = msg("toast.saveFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     }
   }
@@ -429,12 +478,12 @@
     try {
       detail = await LibraryService.ApplyOnlineMetadata(input);
       matching = false;
-      toast = "Métadonnées en ligne appliquées";
+      toast = msg("toast.onlineMetadataApplied");
       setTimeout(() => (toast = ""), 4000);
       await Promise.all([loadSidebar(), loadBooks()]);
     } catch (e) {
       console.error("[Reliure] ApplyOnlineMetadata failed", e);
-      toast = `Application impossible · ${errorMessage(e)}`;
+      toast = msg("toast.applyFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
       throw e;
     }
@@ -461,13 +510,13 @@
         series: batchSeries,
         seriesIndexStart: batchSeriesStart,
       });
-      toast = `${res.updated} livre${res.updated === 1 ? "" : "s"} mis à jour`;
+      toast = msg("toast.batchUpdated", countParams(res.updated));
       setTimeout(() => (toast = ""), 4000);
       clearSelection();
       await Promise.all([loadSidebar(), loadBooks()]);
     } catch (e) {
       console.error("[Reliure] BatchSetSeries failed", e);
-      toast = `Édition par lot impossible · ${errorMessage(e)}`;
+      toast = msg("toast.batchFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     }
   }
@@ -478,7 +527,7 @@
     try {
       return JSON.stringify(e);
     } catch {
-      return "erreur inconnue";
+      return msg("common.error.unknown");
     }
   }
 
@@ -534,6 +583,25 @@
   async function setWatchFolderDelete(enabled: boolean) {
     settings = await WatchFolderService.SetDeleteSource(enabled);
   }
+  async function setContentSearchEnabled(enabled: boolean) {
+    settings = await SettingsService.SetContentSearchEnabled(enabled);
+    if (enabled) {
+      toast = msg("toast.contentIndexStarted");
+      setTimeout(() => (toast = ""), 5000);
+    }
+  }
+  async function setContentSearchContext(mode: "minimal" | "phrase" | "paragraph") {
+    settings = await SettingsService.SetContentSearchContext(mode);
+    if (query.trim()) await loadBooks();
+  }
+  async function reindexContent() {
+    const res = await LibraryService.ReindexContent();
+    toast =
+      msg("toast.contentIndexed", countParams(res.indexed)) +
+      (res.empty ? ` · ${msg("toast.contentEmpty", countParams(res.empty))}` : "") +
+      (res.failed ? ` · ${msg("toast.failures", countParams(res.failed))}` : "");
+    setTimeout(() => (toast = ""), 7000);
+  }
 
   // applyTheme reflects the choice onto the document: "system" removes the
   // attribute so the OS preference (via CSS) governs; light/dark pin it. The
@@ -551,16 +619,21 @@
     applyTheme(theme);
     settings = await SettingsService.SetTheme(theme);
   }
+  async function setLanguage(language: Locale) {
+    setDocumentLocale(language);
+    settings = await SettingsService.SetLanguage(language);
+    setDocumentLocale(settings.language);
+  }
   async function regenerateCovers() {
     try {
       const res = await LibraryService.RegenerateCovers();
       toast = res.updated
-        ? `${res.updated} vignette${res.updated === 1 ? "" : "s"} générée${res.updated === 1 ? "" : "s"}`
-        : "Aucune vignette à générer";
+        ? msg("toast.coversGenerated", countParams(res.updated))
+        : msg("toast.noCoverGenerated");
       setTimeout(() => (toast = ""), 5000);
       await loadBooks();
     } catch (e) {
-      toast = `Régénération impossible · ${errorMessage(e)}`;
+      toast = msg("toast.coverFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     }
   }
@@ -583,15 +656,15 @@
     try {
       const res = await CalibreService.SendBooks(orderedIds);
       toast =
-        `${res.sent} envoyé${res.sent === 1 ? "" : "s"} vers la liseuse` +
-        (res.failed ? ` · ${res.failed} échec${res.failed === 1 ? "" : "s"}` : "") +
-        (res.inventoryError ? " · inventaire non mis à jour" : "");
+        msg("toast.sentToReader", countParams(res.sent)) +
+        (res.failed ? ` · ${msg("toast.failures", countParams(res.failed))}` : "") +
+        (res.inventoryError ? ` · ${msg("toast.inventoryNotUpdated")}` : "");
       setTimeout(() => (toast = ""), 6000);
       clearSelection();
       await Promise.all([refreshDeviceStates(), loadSmartShelves()]);
       if (view.kind === "shelf") await loadBooks();
     } catch (e) {
-      toast = `Envoi impossible · ${errorMessage(e)}`;
+      toast = msg("toast.sendFailed", { error: errorMessage(e) });
       setTimeout(() => (toast = ""), 6000);
     } finally {
       sending = false;
@@ -611,6 +684,7 @@
     SettingsService.Get().then((s) => {
       settings = s;
       applyTheme(s.theme);
+      setDocumentLocale(s.language);
     }).catch(() => {});
 
     const offCalibre = Events.On("calibre:status", (e: { data: CalibreStatus }) => {
@@ -621,7 +695,12 @@
     });
     const offCalibreProgress = Events.On("calibre:progress", (e: { data: CalibreSendProgress }) => {
       const p = e.data;
-      toast = `Envoi ${p.done}/${p.total} · ${p.title}${p.ok ? "" : " (échec)"}`;
+      toast = msg("toast.sendProgress", {
+        done: p.done,
+        total: p.total,
+        title: p.title,
+        failed: p.ok ? "" : msg("toast.failedSuffix"),
+      });
     });
 
     const offProgress = Events.On("import:progress", (e: { data: ImportProgress }) => {
@@ -633,10 +712,10 @@
       progress = null;
       const s = e.data;
       toast =
-        `${s.imported} importé${s.imported === 1 ? "" : "s"}` +
-        (s.attached ? ` · ${s.attached} format${s.attached === 1 ? "" : "s"} ajouté${s.attached === 1 ? "" : "s"}` : "") +
-        (s.duplicates ? ` · ${s.duplicates} doublon${s.duplicates === 1 ? "" : "s"}` : "") +
-        (s.failed ? ` · ${s.failed} échec${s.failed === 1 ? "" : "s"}` : "");
+        msg("toast.imported", countParams(s.imported)) +
+        (s.attached ? ` · ${msg("toast.formatAttached", countParams(s.attached))}` : "") +
+        (s.duplicates ? ` · ${msg("toast.duplicates", countParams(s.duplicates))}` : "") +
+        (s.failed ? ` · ${msg("toast.failures", countParams(s.failed))}` : "");
       setTimeout(() => (toast = ""), 6000);
       loadSidebar();
       loadBooks();
@@ -697,20 +776,20 @@
     <header class="toolbar">
       <div class="title">
         {#if parentBrowseMode}
-          <button class="back" onclick={backToGroups} aria-label="Retour aux groupes">
+          <button class="back" onclick={backToGroups} aria-label={msg("common.back")}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            Retour
+            {msg("common.back")}
           </button>
         {/if}
-        <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? "Auteurs" : browseMode === "series" ? "Séries" : "Tags"}</h1>
-        {#if view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
+        <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? msg("view.authors") : browseMode === "series" ? msg("view.series") : msg("view.tags")}</h1>
+        {#if view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
           <span class="n">{visibleCount}</span>
         {/if}
       </div>
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
         <div class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path
@@ -719,19 +798,19 @@
           >
           <input
             type="search"
-            placeholder="Rechercher…"
+            placeholder={msg("common.search.placeholder")}
             value={query}
             oninput={onSearch}
-            aria-label="Rechercher"
+            aria-label={msg("common.search")}
           />
         </div>
 
         <div class="sort">
-          <select value={browseMode} onchange={(e) => setBrowseMode((e.target as HTMLSelectElement).value as any)} aria-label="Vue">
-            <option value="books">Livres</option>
-            <option value="author">Auteurs</option>
-            <option value="series">Séries</option>
-            <option value="tag">Tags</option>
+          <select value={browseMode} onchange={(e) => setBrowseMode((e.target as HTMLSelectElement).value as any)} aria-label={msg("view.select")}>
+            <option value="books">{msg("view.books")}</option>
+            <option value="author">{msg("view.authors")}</option>
+            <option value="series">{msg("view.series")}</option>
+            <option value="tag">{msg("view.tags")}</option>
           </select>
         </div>
       {/if}
@@ -739,27 +818,27 @@
       {#if browseMode === "books" && view.kind === "all" && !query.trim()}
         <div class="sort">
           <select value={sort} onchange={(e) => setSort((e.target as HTMLSelectElement).value as any)}>
-            <option value="title">Titre</option>
-            <option value="author">Auteur</option>
-            <option value="added">Ajout récent</option>
+            <option value="title">{msg("view.title")}</option>
+            <option value="author">{msg("view.author")}</option>
+            <option value="added">{msg("view.recentAdded")}</option>
           </select>
         </div>
       {/if}
 
-      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
-        <div class="viewtoggle" role="group" aria-label="Affichage">
-          <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label="Grille">
+      {#if browseMode === "books" && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
+        <div class="viewtoggle" role="group" aria-label={msg("view.display")}>
+          <button class:active={viewMode === "grid"} onclick={() => (viewMode = "grid")} aria-label={msg("view.grid")}>
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor"/></svg>
           </button>
-          <button class:active={viewMode === "list"} onclick={() => (viewMode = "list")} aria-label="Liste">
+          <button class:active={viewMode === "list"} onclick={() => (viewMode = "list")} aria-label={msg("view.list")}>
             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </button>
         </div>
       {/if}
 
-      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "dashboard" && view.kind !== "shelves"}
+      {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
         <button class="import" onclick={doImport} disabled={importing}>
-          {importing ? "Import…" : "Importer"}
+          {importing ? msg("view.importing") : msg("view.import")}
         </button>
       {/if}
     </header>
@@ -773,16 +852,16 @@
 
     {#if selectedIds.length}
       <div class="batchbar">
-        <span class="sel">{selectedIds.length} sélectionné{selectedIds.length === 1 ? "" : "s"}</span>
-        <input bind:value={batchSeries} placeholder="Série" aria-label="Série" />
-        <input class="small" bind:value={batchSeriesStart} placeholder="Tome départ" aria-label="Tome de départ" />
-        <button onclick={applyBatchSeries}>Assigner</button>
+        <span class="sel">{msg("view.selected", countParams(selectedIds.length))}</span>
+        <input bind:value={batchSeries} placeholder={msg("view.series")} aria-label={msg("view.series")} />
+        <input class="small" bind:value={batchSeriesStart} placeholder={msg("view.seriesStart")} aria-label={msg("view.seriesStart.aria")} />
+        <button onclick={applyBatchSeries}>{msg("view.assign")}</button>
         {#if calibre?.connected}
           <button class="send" onclick={sendToDevice} disabled={sending}>
-            {sending ? "Envoi…" : `Envoyer vers ${calibre.device || "la liseuse"}`}
+            {sending ? msg("view.sending") : msg("view.sendToReader", { device: calibre.device || msg("settings.reader.title").toLowerCase() })}
           </button>
         {/if}
-        <button class="ghost" onclick={clearSelection}>Annuler</button>
+        <button class="ghost" onclick={clearSelection}>{msg("common.cancel")}</button>
       </div>
     {/if}
 
@@ -807,18 +886,30 @@
             onSetWatchFolderEnabled={setWatchFolderEnabled}
             onSetWatchFolderDelay={setWatchFolderDelay}
             onSetWatchFolderDelete={setWatchFolderDelete}
+            onSetContentSearchEnabled={setContentSearchEnabled}
+            onSetContentSearchContext={setContentSearchContext}
+            onReindexContent={reindexContent}
             onRegenerateCovers={regenerateCovers}
             onSetTheme={setTheme}
+            onSetLanguage={setLanguage}
             onChooseKoreader={chooseKoreaderAndSync}
             onSyncKoreader={syncKoreader}
             onSyncKoreaderFromDevice={syncKoreaderFromDevice}
             {syncingKoreader}
           />
         {:else}
-          <p class="state">Chargement…</p>
+          <p class="state">{msg("common.loading")}</p>
         {/if}
       {:else if view.kind === "dashboard"}
         <Dashboard onOpenBook={openBook} onSelectStatus={(status) => selectView({ kind: "reading", status })} />
+      {:else if view.kind === "contentOccurrences"}
+        <ContentOccurrences
+          query={view.query}
+          scope={view.scope}
+          title={view.title}
+          onBack={closeContentOccurrences}
+          onOpen={openBook}
+        />
       {:else if view.kind === "shelves"}
         <SmartShelves
           shelves={smartShelves}
@@ -834,14 +925,14 @@
         <Annotations onOpen={openBook} />
       {:else if view.kind === "quickedit"}
         {#if quickLoading}
-          <p class="state">Chargement…</p>
+          <p class="state">{msg("common.loading")}</p>
         {:else}
           <QuickEditTable rows={quickRows} saving={quickSaving} onSave={saveQuickEdit} onReload={loadQuickEdit} />
         {/if}
       {:else if browseMode !== "books"}
         {#if groupItems.length === 0}
           <div class="empty">
-            <p>{query.trim() ? `Aucun groupe pour « ${query} ».` : "Aucun groupe à afficher."}</p>
+            <p>{query.trim() ? msg("view.noGroupQuery", { query }) : msg("view.noGroup")}</p>
           </div>
         {:else if browseMode === "author"}
           <GroupGrid items={groupItems} kind="author" onOpen={(item) => openGroup("author", item)} />
@@ -851,21 +942,24 @@
           <GroupGrid items={groupItems} kind="tag" onOpen={(item) => openGroup("tag", item)} />
         {/if}
       {:else if loading && books.length === 0}
-        <p class="state">Chargement…</p>
+        <p class="state">{msg("common.loading")}</p>
       {:else if books.length === 0}
         <div class="empty">
           {#if query.trim()}
-            <p>Aucun résultat pour « {query} ».</p>
+            <p>{msg("view.noResult", { query })}</p>
           {:else if view.kind === "all"}
-            <p>Votre bibliothèque est vide.</p>
-            <p class="sub">Importez des fichiers ou un dossier — ou glissez des EPUB ici.</p>
-            <button class="import big" onclick={doImport}>Importer des livres…</button>
+            <p>{msg("view.libraryEmpty")}</p>
+            <p class="sub">{msg("view.libraryEmptyHint")}</p>
+            <button class="import big" onclick={doImport}>{msg("view.importBooks")}</button>
           {:else}
-            <p>Aucun livre ici.</p>
+            <p>{msg("view.noBookHere")}</p>
           {/if}
         </div>
       {:else}
         <BookGrid {books} mode={viewMode} {selectedIds} {deviceStates} {readingStates} onOpen={openBook} onToggleSelect={toggleSelect} />
+        {#if query.trim() && contentSnippets.length}
+          <ContentResults snippets={contentSnippets} onOpen={openBook} onOpenOccurrences={openContentOccurrences} />
+        {/if}
       {/if}
     </div>
   </main>
@@ -898,11 +992,49 @@
 
 {#if dragOver}
   <div class="dropzone file-drop-target-active">
-    <div class="dropcard">Déposez vos livres pour les importer</div>
+    <div class="dropcard">{msg("view.dropBooks")}</div>
   </div>
 {/if}
 
 <style>
+  :global(select) {
+    min-height: 34px;
+    padding: 0.48rem 2rem 0.48rem 0.68rem;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background-color: var(--surface);
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+      linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position:
+      calc(100% - 15px) 50%,
+      calc(100% - 10px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+  }
+  :global(select:hover:not(:disabled)) {
+    border-color: var(--border-hi);
+    background-color: var(--surface-hi);
+  }
+  :global(select:focus) {
+    border-color: var(--border-hi);
+    background-color: var(--surface-hi);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  :global(select:disabled) {
+    cursor: default;
+    opacity: 0.55;
+  }
+
   .app {
     display: flex;
     height: 100vh;
@@ -998,14 +1130,7 @@
   }
 
   .sort select {
-    font: inherit;
-    font-size: 0.85rem;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 0.45rem 0.6rem;
-    outline: none;
+    min-width: 8rem;
   }
 
   .viewtoggle {

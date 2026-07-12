@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SmartShelfDetail, SmartShelfInput, SmartShelfRule, SmartShelfSummary } from "./api";
+  import { plural, t } from "./i18n";
 
   let {
     shelves,
@@ -18,30 +19,30 @@
   } = $props();
 
   const fields = [
-    { value: "tag", label: "Tag" },
-    { value: "author", label: "Auteur" },
-    { value: "series", label: "Série" },
-    { value: "language", label: "Langue" },
-    { value: "format", label: "Format" },
-    { value: "reading_status", label: "Lecture" },
-    { value: "on_device", label: "Liseuse" },
-    { value: "added_within_days", label: "Ajout récent" },
-    { value: "title", label: "Titre" },
+    { value: "tag", label: t("shelves.field.tag") },
+    { value: "author", label: t("shelves.field.author") },
+    { value: "series", label: t("shelves.field.series") },
+    { value: "language", label: t("shelves.field.language") },
+    { value: "format", label: t("shelves.field.format") },
+    { value: "reading_status", label: t("shelves.field.reading") },
+    { value: "on_device", label: t("shelves.field.onDevice") },
+    { value: "added_within_days", label: t("shelves.field.recentAdded") },
+    { value: "title", label: t("shelves.field.title") },
   ];
   const operators = [
-    { value: "is", label: "est" },
-    { value: "is_not", label: "n’est pas" },
-    { value: "contains", label: "contient" },
-    { value: "not_contains", label: "ne contient pas" },
-    { value: "exists", label: "existe" },
-    { value: "not_exists", label: "n’existe pas" },
+    { value: "is", label: t("shelves.operator.is") },
+    { value: "is_not", label: t("shelves.operator.isNot") },
+    { value: "contains", label: t("shelves.operator.contains") },
+    { value: "not_contains", label: t("shelves.operator.notContains") },
+    { value: "exists", label: t("shelves.operator.exists") },
+    { value: "not_exists", label: t("shelves.operator.notExists") },
   ];
   const valueHints: Record<string, string> = {
     reading_status: "unread, reading, complete, abandoned",
     on_device: "present, absent, unknown",
     added_within_days: "30",
     format: "epub, pdf",
-    language: "fr, en…",
+    language: "fr, en...",
   };
 
   let draft = $state<SmartShelfInput>({
@@ -71,7 +72,7 @@
   }
   async function save() {
     if (!draft.name.trim()) {
-      error = "Nom obligatoire";
+      error = t("shelves.nameRequired");
       return;
     }
     saving = true;
@@ -94,24 +95,24 @@
 <div class="shelves-page">
   <section class="list">
     <div class="head">
-      <h2>Étagères intelligentes</h2>
-      <button class="secondary" onclick={reset}>Nouvelle</button>
+      <h2>{t("shelves.title")}</h2>
+      <button class="secondary" onclick={reset}>{t("shelves.newShort")}</button>
     </div>
     {#if loading}
-      <p class="muted">Chargement…</p>
+      <p class="muted">{t("shelves.loading")}</p>
     {:else if shelves.length === 0}
-      <p class="muted">Aucune étagère pour l’instant.</p>
+      <p class="muted">{t("shelves.empty")}</p>
     {:else}
       <div class="cards">
         {#each shelves as shelf (shelf.id)}
           <article class="card">
             <button class="open" onclick={() => onOpen(shelf)}>
               <span class="name ellipsis">{shelf.name}</span>
-              <span class="count">{shelf.count} livre{shelf.count === 1 ? "" : "s"}</span>
+              <span class="count">{t("shelves.count", undefined, { count: shelf.count, s: plural(shelf.count) })}</span>
             </button>
             <div class="actions">
-              <button onclick={() => edit(shelf)}>Renommer</button>
-              <button class="danger" onclick={() => del(shelf.id)}>Supprimer</button>
+              <button onclick={() => edit(shelf)}>{t("shelves.rename")}</button>
+              <button class="danger" onclick={() => del(shelf.id)}>{t("common.delete")}</button>
             </div>
           </article>
         {/each}
@@ -120,16 +121,16 @@
   </section>
 
   <section class="editor">
-    <h2>{draft.id ? "Modifier l’étagère" : "Nouvelle étagère"}</h2>
+    <h2>{draft.id ? t("shelves.edit") : t("shelves.new")}</h2>
     <label>
-      <span>Nom</span>
-      <input bind:value={draft.name} placeholder="SF non lus" />
+      <span>{t("shelves.name")}</span>
+      <input bind:value={draft.name} placeholder={t("shelves.namePlaceholder")} />
     </label>
     <label>
-      <span>Correspondance</span>
+      <span>{t("shelves.match")}</span>
       <select bind:value={draft.match}>
-        <option value="all">Toutes les règles</option>
-        <option value="any">Au moins une règle</option>
+        <option value="all">{t("shelves.allRules")}</option>
+        <option value="any">{t("shelves.anyRule")}</option>
       </select>
     </label>
 
@@ -146,14 +147,14 @@
               <option value={op.value}>{op.label}</option>
             {/each}
           </select>
-          <input bind:value={rule.value} placeholder={valueHints[rule.field] ?? "Valeur"} />
-          <button class="icon" onclick={() => removeRule(i)} aria-label="Retirer la règle">×</button>
+          <input bind:value={rule.value} placeholder={valueHints[rule.field] ?? t("shelves.value")} />
+          <button class="icon" onclick={() => removeRule(i)} aria-label={t("shelves.removeRule")}>×</button>
         </div>
       {/each}
     </div>
-    <button class="secondary" onclick={addRule}>Ajouter une règle</button>
+    <button class="secondary" onclick={addRule}>{t("shelves.addRule")}</button>
     {#if error}<p class="error">{error}</p>{/if}
-    <button class="primary" onclick={save} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
+    <button class="primary" onclick={save} disabled={saving}>{saving ? t("common.saving") : t("common.save")}</button>
   </section>
 </div>
 
@@ -235,16 +236,19 @@
     padding: 0.5rem 0.6rem;
     border: 1px solid var(--border);
     border-radius: 8px;
-    background: var(--inset);
+    background-color: var(--inset);
     color: var(--text);
     font: inherit;
     font-size: 0.85rem;
     outline: none;
   }
+  select {
+    padding-right: 2rem;
+  }
   input:focus,
   select:focus {
     border-color: var(--border-hi);
-    background: var(--surface-hi);
+    background-color: var(--surface-hi);
   }
   .rules {
     display: grid;

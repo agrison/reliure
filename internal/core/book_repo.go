@@ -141,6 +141,12 @@ func (r *BookRepo) Delete(id int64) error {
 	if _, err := tx.Exec(`DELETE FROM book_fts WHERE rowid=?`, id); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM content_fts WHERE rowid=?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM content_index WHERE book_id=?`, id); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

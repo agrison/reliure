@@ -79,6 +79,34 @@ func TestUpdateEmptyDirFallsBack(t *testing.T) {
 	}
 }
 
+func TestLanguageDefaultsAndNormalization(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	s, err := Open(path, "/default/lib")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get().Language; got != "fr" {
+		t.Fatalf("default language = %q, want fr", got)
+	}
+	next := s.Get()
+	next.Language = "de"
+	got, err := s.Update(next)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Language != "de" {
+		t.Fatalf("language = %q, want de", got.Language)
+	}
+	next.Language = "xx"
+	got, err = s.Update(next)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Language != "fr" {
+		t.Fatalf("invalid language should normalize to fr, got %q", got.Language)
+	}
+}
+
 func TestWatchFolderDefaultsAndDelayNormalization(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	s, err := Open(path, "/default/lib")

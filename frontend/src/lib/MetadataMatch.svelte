@@ -1,6 +1,7 @@
 <script lang="ts">
   import { LibraryService } from "./api";
   import type { BookDetail, BookUpdate, OnlineCandidate, ApplyMetadataInput } from "./api";
+  import { t } from "./i18n";
 
   let {
     book,
@@ -37,15 +38,15 @@
     | "description" | "language" | "isbn" | "published" | "tags";
 
   const fields: { key: FieldKey; label: string; multiline?: boolean; authors?: boolean }[] = [
-    { key: "title", label: "Titre" },
-    { key: "authors", label: "Auteurs", authors: true },
-    { key: "series", label: "Série" },
-    { key: "seriesIndex", label: "Tome" },
-    { key: "language", label: "Langue" },
-    { key: "published", label: "Publié" },
+    { key: "title", label: t("metadata.field.title") },
+    { key: "authors", label: t("metadata.field.authors"), authors: true },
+    { key: "series", label: t("metadata.field.series") },
+    { key: "seriesIndex", label: t("quick.seriesIndex") },
+    { key: "language", label: t("metadata.field.language") },
+    { key: "published", label: t("metadata.field.published") },
     { key: "isbn", label: "ISBN" },
-    { key: "tags", label: "Tags" },
-    { key: "description", label: "Description", multiline: true },
+    { key: "tags", label: t("metadata.field.tags") },
+    { key: "description", label: t("metadata.field.description"), multiline: true },
   ];
 
   function currentValue(key: FieldKey): string {
@@ -189,28 +190,28 @@
 
 <div class="scrim" onclick={onClose} role="presentation"></div>
 
-<div class="modal" role="dialog" aria-label="Métadonnées en ligne">
+<div class="modal" role="dialog" aria-label={t("metadata.online.title")}>
   <header class="head">
-    <h2>Métadonnées en ligne</h2>
-    <button class="close" onclick={onClose} aria-label="Fermer">✕</button>
+    <h2>{t("metadata.online.title")}</h2>
+    <button class="close" onclick={onClose} aria-label={t("common.close")}>✕</button>
   </header>
 
   <div class="searchbar">
-    <input bind:value={qTitle} placeholder="Titre" aria-label="Titre" onkeydown={(e) => e.key === "Enter" && search()} />
-    <input bind:value={qAuthors} placeholder="Auteur" aria-label="Auteur" onkeydown={(e) => e.key === "Enter" && search()} />
+    <input bind:value={qTitle} placeholder={t("metadata.field.title")} aria-label={t("metadata.field.title")} onkeydown={(e) => e.key === "Enter" && search()} />
+    <input bind:value={qAuthors} placeholder={t("metadata.online.author")} aria-label={t("metadata.online.author")} onkeydown={(e) => e.key === "Enter" && search()} />
     <input class="isbn" bind:value={qIsbn} placeholder="ISBN" aria-label="ISBN" onkeydown={(e) => e.key === "Enter" && search()} />
-    <input class="lang" bind:value={qLang} placeholder="Langue" aria-label="Langue préférée" title="Langue préférée (les éditions de cette langue apparaissent en premier)" onkeydown={(e) => e.key === "Enter" && search()} />
-    <button class="go" onclick={search} disabled={searching}>{searching ? "…" : "Rechercher"}</button>
+    <input class="lang" bind:value={qLang} placeholder={t("metadata.online.language")} aria-label={t("metadata.online.preferredLanguage")} title={t("metadata.online.preferredLanguageTitle")} onkeydown={(e) => e.key === "Enter" && search()} />
+    <button class="go" onclick={search} disabled={searching}>{searching ? "..." : t("common.search")}</button>
   </div>
 
   <div class="body">
     <div class="results">
       {#if searching}
-        <p class="hint">Recherche…</p>
+        <p class="hint">{t("metadata.online.searching")}</p>
       {:else if error}
         <p class="err">{error}</p>
       {:else if candidates.length === 0}
-        <p class="hint">{searched ? "Aucun résultat. Affinez la recherche." : ""}</p>
+        <p class="hint">{searched ? t("metadata.online.noResult") : ""}</p>
       {:else}
         {#each candidates as c (c.id)}
           <button
@@ -219,7 +220,7 @@
             onclick={() => selectCandidate(c)}
           >
             <div class="thumb">
-              {#if c.coverUrl}<img src={c.coverUrl} alt="" loading="lazy" />{:else}<span class="noimg">—</span>{/if}
+              {#if c.coverUrl}<img src={c.coverUrl} alt="" loading="lazy" />{:else}<span class="noimg">{t("common.none")}</span>{/if}
             </div>
             <div class="cinfo">
               <span class="ctitle">{c.title}</span>
@@ -238,17 +239,17 @@
 
     <div class="merge">
       {#if selected}
-        <p class="mergehint">Cochez les champs à appliquer. Vous pouvez modifier chaque valeur avant de valider.</p>
+        <p class="mergehint">{t("metadata.online.mergeHint")}</p>
 
         <div class="coverrow">
           <label class="chk">
             <input type="checkbox" bind:checked={coverApply} disabled={!selected.coverUrl} />
-            <span>Couverture</span>
+            <span>{t("metadata.online.cover")}</span>
           </label>
           <div class="coverprev">
             {#if selected.coverUrl}
               <img src={selected.coverUrl} alt="" />
-            {:else}<span class="noimg small">aucune</span>{/if}
+            {:else}<span class="noimg small">{t("metadata.online.noCover")}</span>{/if}
           </div>
         </div>
 
@@ -266,28 +267,28 @@
                 <div class="inline">
                   <input bind:value={merge[f.key].value} disabled={!merge[f.key].apply} />
                   {#if f.authors && merge[f.key].value.includes(",")}
-                    <button class="flip" title="Inverser Nom / Prénom" onclick={flipAuthors} disabled={!merge[f.key].apply}>⇄</button>
+                    <button class="flip" title={t("metadata.flipName")} onclick={flipAuthors} disabled={!merge[f.key].apply}>⇄</button>
                   {/if}
                 </div>
               {/if}
-              {#if cur}<span class="cur" title={cur}>actuel : {cur}</span>{/if}
+              {#if cur}<span class="cur" title={cur}>{t("metadata.online.current", undefined, { value: cur })}</span>{/if}
             </div>
           </div>
         {/each}
       {:else if !searching}
-        <p class="hint centered">Sélectionnez une édition à gauche pour composer les métadonnées.</p>
+        <p class="hint centered">{t("metadata.online.selectEdition")}</p>
       {/if}
     </div>
   </div>
 
   <footer class="foot">
     <span class="foothint">
-      {#if selected}Source : {sourceLabels[selected.source] ?? selected.source}{/if}
+      {#if selected}{t("metadata.online.source", undefined, { source: sourceLabels[selected.source] ?? selected.source })}{/if}
     </span>
     <div class="footbtns">
-      <button class="ghost" onclick={onClose}>Annuler</button>
+      <button class="ghost" onclick={onClose}>{t("common.cancel")}</button>
       <button class="primary" onclick={apply} disabled={!selected || applying || nothingSelected}>
-        {applying ? "Application…" : "Appliquer la sélection"}
+        {applying ? t("metadata.online.applying") : t("metadata.online.apply")}
       </button>
     </div>
   </footer>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BookDetail, BookUpdate, ReadingUpdate } from "./api";
+  import { plural, t } from "./i18n";
 
   let {
     book,
@@ -122,7 +123,7 @@
     }).format(d);
   }
   function shortHash(s: string): string {
-    return s ? `${s.slice(0, 12)}…` : "";
+    return s ? `${s.slice(0, 12)}...` : "";
   }
 
   const roleLabels: Record<string, string> = {
@@ -197,9 +198,9 @@
 <div class="scrim" onclick={onClose} role="presentation"></div>
 
 <aside class="drawer">
-  <button class="close" onclick={onClose} aria-label="Fermer">✕</button>
+  <button class="close" onclick={onClose} aria-label={t("common.close")}>✕</button>
   <button class="edit" onclick={() => (editing = !editing)} disabled={saving}>
-    {editing ? "Annuler" : "Modifier"}
+    {editing ? t("common.cancel") : t("detail.edit")}
   </button>
 
   <div class="hero">
@@ -218,45 +219,45 @@
         <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7" />
         <path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18" fill="none" stroke="currentColor" stroke-width="1.7" />
       </svg>
-      Métadonnées en ligne
+      {t("detail.onlineMetadata")}
     </button>
   </div>
 
   {#if editing}
     <form class="editform" onsubmit={(e) => { e.preventDefault(); save(); }}>
       <label>
-        <span>Titre</span>
+        <span>{t("metadata.field.title")}</span>
         <input bind:value={form.title} required />
       </label>
       <label>
-        <span>Titre de tri</span>
+        <span>{t("detail.sortTitle")}</span>
         <input bind:value={form.titleSort} />
       </label>
       <label>
-        <span>Auteurs</span>
-        <input bind:value={form.authors} placeholder="Auteur, Autre auteur" />
+        <span>{t("metadata.field.authors")}</span>
+        <input bind:value={form.authors} placeholder={t("detail.authorsPlaceholder")} />
       </label>
       <div class="twocol">
         <label>
-          <span>Série</span>
+          <span>{t("metadata.field.series")}</span>
           <input bind:value={form.series} />
         </label>
         <label>
-          <span>Tome</span>
+          <span>{t("quick.seriesIndex")}</span>
           <input bind:value={form.seriesIndex} inputmode="decimal" />
         </label>
       </div>
       <label>
-        <span>Tags</span>
-        <input bind:value={form.tags} placeholder="tag, autre tag" />
+        <span>{t("metadata.field.tags")}</span>
+        <input bind:value={form.tags} placeholder={t("detail.tagsPlaceholder")} />
       </label>
       <div class="twocol">
         <label>
-          <span>Langue</span>
+          <span>{t("metadata.field.language")}</span>
           <input bind:value={form.language} />
         </label>
         <label>
-          <span>Publié</span>
+          <span>{t("metadata.field.published")}</span>
           <input bind:value={form.published} />
         </label>
       </div>
@@ -267,20 +268,20 @@
       <div class="override">
         <label class="check">
           <input type="checkbox" bind:checked={form.remotePathOverrideEnabled} />
-          <span>Chemin KOReader personnalisé</span>
+          <span>{t("detail.koreaderCustomPath")}</span>
         </label>
         <input
           bind:value={form.remotePathOverride}
           disabled={!form.remotePathOverrideEnabled}
           placeholder={book.remotePath}
-          aria-label="Chemin KOReader personnalisé"
+          aria-label={t("detail.koreaderCustomPath")}
         />
       </div>
       <label>
-        <span>Description</span>
+        <span>{t("metadata.field.description")}</span>
         <textarea bind:value={form.description} rows="7"></textarea>
       </label>
-      <button class="save" type="submit" disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
+      <button class="save" type="submit" disabled={saving}>{saving ? t("common.saving") : t("common.save")}</button>
     </form>
   {:else}
     <h2>{book.title}</h2>
@@ -295,7 +296,7 @@
 
     {#if book.series}
       <p class="series">
-        {book.series}{book.seriesIndex ? ` — tome ${book.seriesIndex}` : ""}
+        {book.series}{book.seriesIndex ? ` - ${t("content.results.volume", undefined, { index: book.seriesIndex })}` : ""}
       </p>
     {/if}
 
@@ -311,26 +312,26 @@
   {/if}
 
   <dl class="facts">
-    {#if book.language}<div><dt>Langue</dt><dd>{book.language}</dd></div>{/if}
-    {#if book.published}<div><dt>Publié</dt><dd>{book.published}</dd></div>{/if}
+    {#if book.language}<div><dt>{t("metadata.field.language")}</dt><dd>{book.language}</dd></div>{/if}
+    {#if book.published}<div><dt>{t("metadata.field.published")}</dt><dd>{book.published}</dd></div>{/if}
     {#if book.isbn}<div><dt>ISBN</dt><dd>{book.isbn}</dd></div>{/if}
-    {#if book.addedAt}<div><dt>Ajouté</dt><dd>{humanDate(book.addedAt)}</dd></div>{/if}
-    {#if book.updatedAt}<div><dt>Modifié</dt><dd>{humanDate(book.updatedAt)}</dd></div>{/if}
+    {#if book.addedAt}<div><dt>{t("detail.added")}</dt><dd>{humanDate(book.addedAt)}</dd></div>{/if}
+    {#if book.updatedAt}<div><dt>{t("detail.updated")}</dt><dd>{humanDate(book.updatedAt)}</dd></div>{/if}
   </dl>
 
   <div class="meta">
-    <h3>Tri (classement &amp; envoi)</h3>
+    <h3>{t("detail.sortSection")}</h3>
     <div class="sortrow">
-      <span class="sortlabel">Titre</span>
+      <span class="sortlabel">{t("metadata.field.title")}</span>
       <input
         class="sortinput"
         value={book.titleSort}
-        placeholder="défaut : le titre"
+        placeholder={t("detail.defaultTitle")}
         onblur={(e) => commitTitleSort(e.currentTarget.value)}
         onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
       />
       {#if book.titleSort}
-        <button class="clearbtn" title="Effacer" aria-label="Effacer le tri du titre" onclick={() => onSetTitleSort("")}>×</button>
+        <button class="clearbtn" title={t("detail.clear")} aria-label={t("detail.clearTitleSort")} onclick={() => onSetTitleSort("")}>×</button>
       {:else}<span class="clearspacer"></span>{/if}
     </div>
     {#each book.authors ?? [] as a (a.id)}
@@ -339,52 +340,52 @@
         <input
           class="sortinput"
           value={a.sortName}
-          placeholder="défaut : le nom"
+          placeholder={t("detail.defaultName")}
           onblur={(e) => commitAuthorSort(a.id, a.sortName, e.currentTarget.value)}
           onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
         />
         {#if a.sortName}
-          <button class="clearbtn" title="Effacer" aria-label={"Effacer le tri de " + a.name} onclick={() => onSetAuthorSort(a.id, "")}>×</button>
+          <button class="clearbtn" title={t("detail.clear")} aria-label={t("detail.clearAuthorSort", undefined, { name: a.name })} onclick={() => onSetAuthorSort(a.id, "")}>×</button>
         {:else}<span class="clearspacer"></span>{/if}
       </div>
     {/each}
   </div>
 
   <div class="meta">
-      <h3>Lecture</h3>
+      <h3>{t("detail.reading")}</h3>
       <div class="statuschips">
-        <button class:on={!book.readingStatus} onclick={() => setReadingStatus("")}>Non lu</button>
-        <button class:on={book.readingStatus === "reading"} onclick={() => setReadingStatus("reading")}>En cours</button>
-        <button class:on={book.readingStatus === "complete"} onclick={() => setReadingStatus("complete")}>Terminé</button>
-        <button class:on={book.readingStatus === "abandoned"} onclick={() => setReadingStatus("abandoned")}>Abandonné</button>
+        <button class:on={!book.readingStatus} onclick={() => setReadingStatus("")}>{t("detail.unread")}</button>
+        <button class:on={book.readingStatus === "reading"} onclick={() => setReadingStatus("reading")}>{t("nav.reading")}</button>
+        <button class:on={book.readingStatus === "complete"} onclick={() => setReadingStatus("complete")}>{t("detail.complete")}</button>
+        <button class:on={book.readingStatus === "abandoned"} onclick={() => setReadingStatus("abandoned")}>{t("detail.abandoned")}</button>
       </div>
 
       {#if book.readingStatus || book.percent > 0}
         <div class="readbar">
           <div class="rtrack"><div class="rfill" class:done={book.readingStatus === "complete"} style="width:{Math.round((book.readingStatus === 'complete' ? 1 : book.percent) * 100)}%"></div></div>
-          <span class="rpct">{book.readingStatus === "complete" ? "Terminé" : Math.round(book.percent * 100) + " %"}</span>
+          <span class="rpct">{book.readingStatus === "complete" ? t("detail.complete") : Math.round(book.percent * 100) + " %"}</span>
         </div>
       {/if}
 
       <div class="progressedit">
-        <input class="peinput" bind:value={pctInput} inputmode="numeric" aria-label="Pourcentage lu" placeholder="0" onblur={commitPercent} onkeydown={enterBlur} /><span class="peunit">%</span>
-        <span class="pesep">ou</span>
-        <span class="pelabel">page</span>
-        <input class="peinput" bind:value={pageInput} inputmode="numeric" aria-label="Page actuelle" placeholder="—" onblur={commitPage} onkeydown={enterBlur} />
+        <input class="peinput" bind:value={pctInput} inputmode="numeric" aria-label={t("detail.percentRead")} placeholder="0" onblur={commitPercent} onkeydown={enterBlur} /><span class="peunit">%</span>
+        <span class="pesep">{t("detail.or")}</span>
+        <span class="pelabel">{t("detail.page")}</span>
+        <input class="peinput" bind:value={pageInput} inputmode="numeric" aria-label={t("detail.currentPage")} placeholder={t("common.none")} onblur={commitPage} onkeydown={enterBlur} />
         <span class="peunit">/</span>
-        <input class="peinput" bind:value={totalInput} inputmode="numeric" aria-label="Nombre de pages" placeholder="total" onblur={commitPage} onkeydown={enterBlur} />
+        <input class="peinput" bind:value={totalInput} inputmode="numeric" aria-label={t("detail.pageCount")} placeholder={t("detail.total")} onblur={commitPage} onkeydown={enterBlur} />
       </div>
 
       {#if book.pages > 0 || book.lastReadAt}
         <div class="readmeta">
-          {#if book.pages > 0 && book.readingStatus !== "complete" && book.percent > 0}<span>page {Math.max(1, Math.round(book.percent * book.pages))} / {book.pages}</span>{/if}
-          {#if book.lastReadAt}<span>Dernière lecture : {book.lastReadAt}</span>{/if}
+          {#if book.pages > 0 && book.readingStatus !== "complete" && book.percent > 0}<span>{t("common.page.short", undefined, { page: Math.max(1, Math.round(book.percent * book.pages)) })} / {book.pages}</span>{/if}
+          {#if book.lastReadAt}<span>{t("detail.lastRead", undefined, { date: book.lastReadAt })}</span>{/if}
         </div>
       {/if}
 
       {#if book.annotations?.length}
         <div class="annos">
-          <div class="annohead">{book.annotations.length} surlignage{book.annotations.length === 1 ? "" : "s"} / note{book.annotations.length === 1 ? "" : "s"}</div>
+          <div class="annohead">{t("annotations.count", undefined, { count: book.annotations.length, s: plural(book.annotations.length) })}</div>
           {#each book.annotations as a}
             <div class="anno">
               {#if a.chapter}<div class="achap">{a.chapter}</div>{/if}
@@ -401,14 +402,14 @@
     <div class="meta">
       <h3>KOReader</h3>
       <div class="kv wide">
-        <span>{book.remotePathOverrideEnabled ? "Override" : "Chemin"}</span>
+        <span>{book.remotePathOverrideEnabled ? "Override" : t("detail.path")}</span>
         <strong>{book.remotePath}</strong>
       </div>
     </div>
   {/if}
 
   <div class="files">
-    <h3>Fichiers</h3>
+    <h3>{t("detail.files")}</h3>
     {#each book.files as f}
       <div class="file">
         <div class="filetop">
@@ -417,7 +418,7 @@
           {#if f.size}<span class="sz">{humanSize(f.size)}</span>{/if}
         </div>
         <div class="filemeta">
-          {#if f.addedAt}<span>Ajouté {humanDate(f.addedAt)}</span>{/if}
+          {#if f.addedAt}<span>{t("detail.added")} {humanDate(f.addedAt)}</span>{/if}
           {#if f.sha256}<span title={f.sha256}>SHA-256 {shortHash(f.sha256)}</span>{/if}
         </div>
       </div>
@@ -426,10 +427,10 @@
 
   <div class="actions">
     <button class="danger" onclick={remove} disabled={removing}>
-      {removing ? "Retrait…" : confirming ? "Confirmer le retrait" : "Retirer de la bibliothèque"}
+      {removing ? t("detail.removing") : confirming ? t("detail.confirmRemove") : t("detail.removeFromLibrary")}
     </button>
     {#if confirming && !removing}
-      <button class="secondary" onclick={() => (confirming = false)}>Annuler</button>
+      <button class="secondary" onclick={() => (confirming = false)}>{t("common.cancel")}</button>
     {/if}
   </div>
 </aside>

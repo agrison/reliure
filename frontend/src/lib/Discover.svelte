@@ -1,6 +1,7 @@
 <script lang="ts">
   import { LibraryService } from "./api";
   import type { GutenbergResult, GutenbergBook } from "./api";
+  import { plural, t } from "./i18n";
 
   // Self-contained "Découvrir" view: browse Project Gutenberg and add a book's
   // EPUB to the library. Imports go through the normal pipeline, so the global
@@ -17,12 +18,12 @@
   let added = $state<Record<number, "added" | "duplicate" | "failed">>({});
 
   const languages = [
-    { code: "fr", label: "Français" },
-    { code: "en", label: "Anglais" },
-    { code: "es", label: "Espagnol" },
-    { code: "de", label: "Allemand" },
-    { code: "it", label: "Italien" },
-    { code: "", label: "Toutes langues" },
+    { code: "fr", label: t("language.fr") },
+    { code: "en", label: t("language.en") },
+    { code: "es", label: t("language.es") },
+    { code: "de", label: t("language.de") },
+    { code: "it", label: t("language.it") },
+    { code: "", label: t("discover.language.all") },
   ];
 
   async function search(page = 1) {
@@ -63,17 +64,17 @@
   }
 
   function addLabel(b: GutenbergBook): string {
-    if (adding[b.id]) return "Ajout…";
+    if (adding[b.id]) return t("discover.adding");
     switch (added[b.id]) {
-      case "added": return "Ajouté ✓";
-      case "duplicate": return "Déjà présent";
-      case "failed": return "Échec — réessayer";
-      default: return "Ajouter";
+      case "added": return t("discover.status.added");
+      case "duplicate": return t("discover.status.duplicate");
+      case "failed": return t("discover.status.failed");
+      default: return t("discover.add");
     }
   }
 
   const totalLabel = $derived(
-    result ? `${result.count.toLocaleString("fr-FR")} livre${result.count === 1 ? "" : "s"}` : "",
+    result ? t("discover.total", undefined, { count: result.count.toLocaleString("fr-FR"), s: plural(result.count) }) : "",
   );
 
   // Initial browse: popular French books.
@@ -87,26 +88,26 @@
     <div class="searchwrap">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
       <input
-        placeholder="Titre ou auteur…"
+        placeholder={t("discover.searchPlaceholder")}
         bind:value={query}
         onkeydown={(e) => e.key === "Enter" && search(1)}
       />
     </div>
-    <select bind:value={lang} onchange={() => search(1)} aria-label="Langue">
+    <select bind:value={lang} onchange={() => search(1)} aria-label={t("settings.language.label")}>
       {#each languages as l (l.code)}<option value={l.code}>{l.label}</option>{/each}
     </select>
-    <button class="go" onclick={() => search(1)} disabled={loading}>{loading ? "…" : "Rechercher"}</button>
-    <span class="src">Project Gutenberg · domaine public</span>
+    <button class="go" onclick={() => search(1)} disabled={loading}>{loading ? "..." : t("common.search")}</button>
+    <span class="src">{t("discover.publicDomain")}</span>
   </div>
 
   {#if slow}
-    <p class="slow">Téléchargement du catalogue Gutenberg (~21 Mo, une seule fois) — ensuite les recherches sont instantanées et hors ligne.</p>
+    <p class="slow">{t("discover.loadingCatalog")}</p>
   {/if}
 
   {#if error}
     <p class="msg err">{error}</p>
   {:else if loading && !result}
-    <p class="msg">Chargement…</p>
+    <p class="msg">{t("common.loading")}</p>
   {:else if result}
     {@const r = result}
     <div class="meta">
@@ -114,14 +115,14 @@
       {#if r.count > 0}
         <div class="pager">
           <button onclick={() => search(r.page - 1)} disabled={!r.hasPrevious || loading}>‹</button>
-          <span>Page {r.page}</span>
+          <span>{t("discover.page", undefined, { page: r.page })}</span>
           <button onclick={() => search(r.page + 1)} disabled={!r.hasNext || loading}>›</button>
         </div>
       {/if}
     </div>
 
     {#if (r.books ?? []).length === 0}
-      <p class="msg">Aucun livre pour cette recherche.</p>
+      <p class="msg">{t("discover.empty")}</p>
     {:else}
       <div class="grid">
         {#each r.books ?? [] as b (b.id)}
@@ -144,9 +145,9 @@
                 class:fail={added[b.id] === "failed"}
                 onclick={() => addBook(b)}
                 disabled={adding[b.id] || added[b.id] === "added" || !b.hasEpub}
-                title={b.hasEpub ? "" : "Aucun EPUB disponible"}
+                title={b.hasEpub ? "" : t("discover.noEpub")}
               >
-                {b.hasEpub ? addLabel(b) : "Pas d'EPUB"}
+                {b.hasEpub ? addLabel(b) : t("discover.noEpub.short")}
               </button>
             </div>
           </article>
@@ -198,14 +199,7 @@
     background: var(--surface-hi);
   }
   select {
-    font: inherit;
-    font-size: 0.85rem;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 0.5rem 0.6rem;
-    outline: none;
+    min-width: 8rem;
   }
   .go {
     padding: 0.55rem 1rem;

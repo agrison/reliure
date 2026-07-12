@@ -35,6 +35,10 @@ func syncFTS(tx querier, bookID int64) error {
 // Search runs a full-text query and returns the matching full books, ranked by
 // relevance (bm25). limit <= 0 → 50 by default.
 func (r *BookRepo) Search(query string, limit int) ([]*Book, error) {
+	return r.SearchScoped(query, SearchScope{}, limit)
+}
+
+func (r *BookRepo) SearchScoped(query string, scope SearchScope, limit int) ([]*Book, error) {
 	match := ftsQuery(query)
 	if match == "" {
 		return nil, nil
@@ -42,11 +46,13 @@ func (r *BookRepo) Search(query string, limit int) ([]*Book, error) {
 	if limit <= 0 {
 		limit = 50
 	}
+	filter, args := bookScopeFilter(scope)
+	args = append([]any{match}, args...)
 	q := `SELECT ` + bookCols + `
 	      FROM book_fts f JOIN book b ON b.id = f.rowid
-	      WHERE book_fts MATCH ?
+	      WHERE book_fts MATCH ?` + filter + `
 	      ORDER BY rank` + limitClause(limit, 0)
-	books, err := r.scanBooks(q, match)
+	books, err := r.scanBooks(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -69,4 +75,28 @@ func ftsQuery(raw string) string {
 		terms = append(terms, `"`+f+`"*`)
 	}
 	return strings.Join(terms, " ")
+}
+
+func bookScopeFilter(scope SearchScope) (string, []any) {
+	switch scope.Kind {
+	case "author":
+		if scope.ID == 0 {
+			return ` AND NOT EXISTS (SELECT 1 FROM book_author ba WHERE ba.book_id = b.id)`, nil
+		}
+		return ` AND EXISTS (SELECT 1 FROM book_author ba WHERE ba.book_id = b.id AND ba.author_id = ?)`, []any{scope.ID}
+	case "series":
+		if scope.ID == 0 {
+			return ` AND b.series_id IS NULL`, nil
+		}
+		return ` AND b.series_id = ?`, []any{scope.ID}
+	case "tag":
+		if scope.ID == 0 {
+			return ` AND NOT EXISTS (SELECT 1 FROM book_tag bt WHERE bt.book_id = b.id)`, nil
+		}
+		return ` AND EXISTS (SELECT 1 FROM book_tag bt WHERE bt.book_id = b.id AND bt.tag_id = ?)`, []any{scope.ID}
+	case "book":
+		return ` AND b.id = ?`, []any{scope.ID}
+	default:
+		return "", nil
+	}
 }

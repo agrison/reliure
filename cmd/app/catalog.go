@@ -162,6 +162,31 @@ type SidebarItem struct {
 	Count int    `json:"count"`
 }
 
+type SearchScope struct {
+	Kind string `json:"kind"`
+	ID   int64  `json:"id"`
+}
+
+type ContentSnippet struct {
+	BookID      int64   `json:"bookId"`
+	Title       string  `json:"title"`
+	Authors     string  `json:"authors"`
+	Series      string  `json:"series"`
+	SeriesIndex float64 `json:"seriesIndex"`
+	Cover       string  `json:"cover"`
+	Page        int     `json:"page"`
+	Snippet     string  `json:"snippet"`
+	More        int     `json:"more"`
+}
+
+type ContentOccurrencePage struct {
+	Total      int              `json:"total"`
+	Page       int              `json:"page"`
+	PerPage    int              `json:"perPage"`
+	TotalPages int              `json:"totalPages"`
+	Items      []ContentSnippet `json:"items"`
+}
+
 // Books returns all books in the given sort order ("title", "author", "added").
 func (s *LibraryService) Books(sort string) ([]BookCard, error) {
 	books, err := s.db.Books.Browse(sort, 0, 0)
@@ -173,11 +198,77 @@ func (s *LibraryService) Books(sort string) ([]BookCard, error) {
 
 // Search returns books matching a full-text query, ranked by relevance.
 func (s *LibraryService) Search(query string) ([]BookCard, error) {
-	books, err := s.db.Books.Search(query, 200)
+	return s.SearchScoped(query, SearchScope{})
+}
+
+// SearchScoped returns metadata matches, plus content matches when content
+// search is enabled, constrained to the current library view.
+func (s *LibraryService) SearchScoped(query string, scope SearchScope) ([]BookCard, error) {
+	coreScope := core.SearchScope{Kind: scope.Kind, ID: scope.ID}
+	books, err := s.db.Books.SearchScoped(query, coreScope, 200)
 	if err != nil {
 		return nil, err
 	}
+	if s.settings.Get().ContentSearchEnabled {
+		contentBooks, err := s.db.Content.Search(query, coreScope, 200)
+		if err != nil {
+			return nil, err
+		}
+		books = mergeBooks(books, contentBooks)
+	}
 	return cards(books), nil
+}
+
+func (s *LibraryService) ContentSnippets(query string, scope SearchScope, booksLimit, hitsPerBook int) ([]ContentSnippet, error) {
+	if !s.settings.Get().ContentSearchEnabled {
+		return nil, nil
+	}
+	coreScope := core.SearchScope{Kind: scope.Kind, ID: scope.ID}
+	hits, err := s.db.Content.Snippets(query, coreScope, booksLimit, hitsPerBook, s.settings.Get().ContentSearchContext)
+	if err != nil {
+		return nil, err
+	}
+	return contentSnippets(hits), nil
+}
+
+func (s *LibraryService) ContentOccurrences(query string, scope SearchScope, page, perPage int) (ContentOccurrencePage, error) {
+	if !s.settings.Get().ContentSearchEnabled {
+		return ContentOccurrencePage{Page: 1, PerPage: perPage}, nil
+	}
+	cfg := s.settings.Get()
+	res, err := s.db.Content.Occurrences(query, core.SearchScope{Kind: scope.Kind, ID: scope.ID}, page, perPage, cfg.ContentSearchContext)
+	if err != nil {
+		return ContentOccurrencePage{}, err
+	}
+	totalPages := 0
+	if res.PerPage > 0 {
+		totalPages = (res.Total + res.PerPage - 1) / res.PerPage
+	}
+	return ContentOccurrencePage{
+		Total:      res.Total,
+		Page:       res.Page,
+		PerPage:    res.PerPage,
+		TotalPages: totalPages,
+		Items:      contentSnippets(res.Hits),
+	}, nil
+}
+
+func contentSnippets(hits []core.ContentHit) []ContentSnippet {
+	out := make([]ContentSnippet, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, ContentSnippet{
+			BookID:      h.BookID,
+			Title:       h.Title,
+			Authors:     h.Authors,
+			Series:      h.Series,
+			SeriesIndex: h.SeriesIndex,
+			Cover:       coverPathURL(h.Cover),
+			Page:        h.Page,
+			Snippet:     h.Snippet,
+			More:        h.More,
+		})
+	}
+	return out
 }
 
 // BooksByAuthor returns an author's books.
@@ -257,6 +348,26 @@ func (s *LibraryService) SeriesList() ([]SidebarItem, error) {
 // Tags returns the sidebar's tag list with counts.
 func (s *LibraryService) Tags() ([]SidebarItem, error) {
 	return sidebar(s.db.Tags.Counts())
+}
+
+func mergeBooks(primary, secondary []*core.Book) []*core.Book {
+	seen := make(map[int64]bool, len(primary)+len(secondary))
+	out := make([]*core.Book, 0, len(primary)+len(secondary))
+	for _, b := range primary {
+		if b == nil || seen[b.ID] {
+			continue
+		}
+		seen[b.ID] = true
+		out = append(out, b)
+	}
+	for _, b := range secondary {
+		if b == nil || seen[b.ID] {
+			continue
+		}
+		seen[b.ID] = true
+		out = append(out, b)
+	}
+	return out
 }
 
 // AuthorGroups returns author tiles for the grouped library view, including a
@@ -771,6 +882,13 @@ func coverURL(b *core.Book) string {
 		url += "?v=" + strconv.FormatInt(b.UpdatedAt.Unix(), 10)
 	}
 	return url
+}
+
+func coverPathURL(path string) string {
+	if path == "" {
+		return ""
+	}
+	return coverURLPrefix + path
 }
 
 func seriesName(b *core.Book) string {

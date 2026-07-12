@@ -8,5 +8,9 @@ const saved = localStorage.getItem("theme");
 if (saved === "light" || saved === "dark") {
   document.documentElement.dataset.theme = saved;
 }
+const savedLanguage = localStorage.getItem("language");
+if (savedLanguage === "fr" || savedLanguage === "en" || savedLanguage === "de" || savedLanguage === "es" || savedLanguage === "it") {
+  document.documentElement.lang = savedLanguage;
+}
 
 mount(App, { target: document.getElementById("app")! });

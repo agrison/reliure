@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	ebookcontent "github.com/agrison/reliure/internal/content"
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/gutenberg"
 	"github.com/agrison/reliure/internal/library"
@@ -58,6 +59,13 @@ type ImportSummary struct {
 	Attached   int `json:"attached"`
 	Duplicates int `json:"duplicates"`
 	Failed     int `json:"failed"`
+}
+
+type ContentReindexResult struct {
+	Total   int `json:"total"`
+	Indexed int `json:"indexed"`
+	Empty   int `json:"empty"`
+	Failed  int `json:"failed"`
 }
 
 // RemoveBookResult describes how a removed book was handled.
@@ -114,6 +122,7 @@ func (s *LibraryService) importPathsMode(paths []string, mode library.Mode) (Imp
 	})
 
 	files := expandPaths(imp, paths)
+	var contentBookIDs []int64
 	sum, err := imp.Import(context.Background(), files, func(p library.Progress) {
 		ev := ImportProgress{
 			Total:   p.Total,
@@ -126,6 +135,9 @@ func (s *LibraryService) importPathsMode(paths []string, mode library.Mode) (Imp
 			ev.Error = p.Err.Error()
 		}
 		application.Get().Event.Emit(progressEvent, ev)
+		if (p.Outcome == library.OutcomeImported || p.Outcome == library.OutcomeAttached) && p.BookID != 0 {
+			contentBookIDs = append(contentBookIDs, p.BookID)
+		}
 	})
 
 	summary := ImportSummary{
@@ -136,7 +148,42 @@ func (s *LibraryService) importPathsMode(paths []string, mode library.Mode) (Imp
 		Failed:     sum.Failed,
 	}
 	application.Get().Event.Emit(doneEvent, summary)
+	if cfg.ContentSearchEnabled && len(contentBookIDs) > 0 {
+		ids := uniqueInt64(contentBookIDs)
+		go s.indexContentBooks(ids)
+	}
 	return summary, err
+}
+
+func (s *LibraryService) indexContentBooks(ids []int64) {
+	idx := ebookcontent.Indexer{DB: s.db}
+	for _, id := range ids {
+		if _, err := idx.IndexBook(context.Background(), id); err != nil {
+			log.Printf("ContentSearch: index book %d failed: %v", id, err)
+		}
+	}
+}
+
+func (s *LibraryService) reindexContentQuietly() {
+	res, err := (ebookcontent.Indexer{DB: s.db}).ReindexAll(context.Background())
+	if err != nil {
+		log.Printf("ContentSearch: reindex failed: %v", err)
+		return
+	}
+	log.Printf("ContentSearch: reindex done total=%d indexed=%d empty=%d failed=%d", res.Total, res.Indexed, res.Empty, res.Failed)
+}
+
+func uniqueInt64(in []int64) []int64 {
+	seen := make(map[int64]bool, len(in))
+	out := make([]int64, 0, len(in))
+	for _, id := range in {
+		if id == 0 || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 // RemoveBook removes a book from the library index. Files stored inside the
@@ -230,4 +277,17 @@ func expandPaths(imp *library.Importer, paths []string) []string {
 func (s *LibraryService) Stats() (LibraryStats, error) {
 	n, err := s.db.Books.Count()
 	return LibraryStats{Books: n}, err
+}
+
+// ReindexContent extracts text from every indexed ebook file and rebuilds the
+// content FTS index. It can take time on large libraries, so the UI exposes it
+// as an explicit maintenance action.
+func (s *LibraryService) ReindexContent() (ContentReindexResult, error) {
+	res, err := (ebookcontent.Indexer{DB: s.db}).ReindexAll(context.Background())
+	return ContentReindexResult{
+		Total:   res.Total,
+		Indexed: res.Indexed,
+		Empty:   res.Empty,
+		Failed:  res.Failed,
+	}, err
 }

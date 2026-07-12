@@ -10,43 +10,50 @@ import (
 // is the import mode: "copy" (Reliure manages copies in its library folder) or
 // "reference" (files are indexed where they already live).
 type SettingsService struct {
-	store *settings.Store
+	store   *settings.Store
+	library *LibraryService
 }
 
 // AppSettings is the frontend-facing settings shape (flat, JSON-friendly).
 type AppSettings struct {
-	ImportMode          string `json:"importMode"` // "copy" | "reference"
-	LibraryDir          string `json:"libraryDir"`
-	RemotePathTemplate  string `json:"remotePathTemplate"`
-	OPDSEnabled         bool   `json:"opdsEnabled"`
-	OPDSPort            int    `json:"opdsPort"`
-	WriteMetadataToFile bool   `json:"writeMetadataToFile"`
-	Theme               string `json:"theme"`
-	KoreaderSyncDir     string `json:"koreaderSyncDir"`
-	FeatureDiscover     bool   `json:"featureDiscover"`
-	FeatureSmartShelves bool   `json:"featureSmartShelves"`
-	WatchFolderEnabled  bool   `json:"watchFolderEnabled"`
-	WatchFolderDir      string `json:"watchFolderDir"`
-	WatchFolderDelay    int    `json:"watchFolderDelaySeconds"`
-	WatchFolderDelete   bool   `json:"watchFolderDeleteSource"`
+	ImportMode           string `json:"importMode"` // "copy" | "reference"
+	LibraryDir           string `json:"libraryDir"`
+	RemotePathTemplate   string `json:"remotePathTemplate"`
+	OPDSEnabled          bool   `json:"opdsEnabled"`
+	OPDSPort             int    `json:"opdsPort"`
+	WriteMetadataToFile  bool   `json:"writeMetadataToFile"`
+	Theme                string `json:"theme"`
+	Language             string `json:"language"`
+	KoreaderSyncDir      string `json:"koreaderSyncDir"`
+	FeatureDiscover      bool   `json:"featureDiscover"`
+	FeatureSmartShelves  bool   `json:"featureSmartShelves"`
+	WatchFolderEnabled   bool   `json:"watchFolderEnabled"`
+	WatchFolderDir       string `json:"watchFolderDir"`
+	WatchFolderDelay     int    `json:"watchFolderDelaySeconds"`
+	WatchFolderDelete    bool   `json:"watchFolderDeleteSource"`
+	ContentSearchEnabled bool   `json:"contentSearchEnabled"`
+	ContentSearchContext string `json:"contentSearchContext"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
 	return AppSettings{
-		ImportMode:          string(s.ImportMode),
-		LibraryDir:          s.LibraryDir,
-		RemotePathTemplate:  s.RemotePathTemplate,
-		OPDSEnabled:         s.OPDSEnabled,
-		OPDSPort:            s.OPDSPort,
-		WriteMetadataToFile: s.WriteMetadataToFile,
-		Theme:               s.Theme,
-		KoreaderSyncDir:     s.KoreaderSyncDir,
-		FeatureDiscover:     s.FeatureDiscover,
-		FeatureSmartShelves: s.FeatureSmartShelves,
-		WatchFolderEnabled:  s.WatchFolderEnabled,
-		WatchFolderDir:      s.WatchFolderDir,
-		WatchFolderDelay:    s.WatchFolderDelaySeconds,
-		WatchFolderDelete:   s.WatchFolderDeleteSource,
+		ImportMode:           string(s.ImportMode),
+		LibraryDir:           s.LibraryDir,
+		RemotePathTemplate:   s.RemotePathTemplate,
+		OPDSEnabled:          s.OPDSEnabled,
+		OPDSPort:             s.OPDSPort,
+		WriteMetadataToFile:  s.WriteMetadataToFile,
+		Theme:                s.Theme,
+		Language:             s.Language,
+		KoreaderSyncDir:      s.KoreaderSyncDir,
+		FeatureDiscover:      s.FeatureDiscover,
+		FeatureSmartShelves:  s.FeatureSmartShelves,
+		WatchFolderEnabled:   s.WatchFolderEnabled,
+		WatchFolderDir:       s.WatchFolderDir,
+		WatchFolderDelay:     s.WatchFolderDelaySeconds,
+		WatchFolderDelete:    s.WatchFolderDeleteSource,
+		ContentSearchEnabled: s.ContentSearchEnabled,
+		ContentSearchContext: s.ContentSearchContext,
 	}
 }
 
@@ -107,6 +114,15 @@ func (s *SettingsService) SetTheme(theme string) (AppSettings, error) {
 	return toAppSettings(next), err
 }
 
+// SetLanguage sets the UI language. Unknown values are normalized to French by
+// the settings store.
+func (s *SettingsService) SetLanguage(language string) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.Language = language
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
 // SetFeatureDiscover toggles the Project Gutenberg discovery view.
 func (s *SettingsService) SetFeatureDiscover(enabled bool) (AppSettings, error) {
 	cur := s.store.Get()
@@ -119,6 +135,25 @@ func (s *SettingsService) SetFeatureDiscover(enabled bool) (AppSettings, error) 
 func (s *SettingsService) SetFeatureSmartShelves(enabled bool) (AppSettings, error) {
 	cur := s.store.Get()
 	cur.FeatureSmartShelves = enabled
+	next, err := s.store.Update(cur)
+	return toAppSettings(next), err
+}
+
+// SetContentSearchEnabled toggles indexing/searching inside ebook contents.
+func (s *SettingsService) SetContentSearchEnabled(enabled bool) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.ContentSearchEnabled = enabled
+	next, err := s.store.Update(cur)
+	if err == nil && enabled && s.library != nil {
+		go s.library.reindexContentQuietly()
+	}
+	return toAppSettings(next), err
+}
+
+// SetContentSearchContext stores how much context content search snippets show.
+func (s *SettingsService) SetContentSearchContext(mode string) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.ContentSearchContext = mode
 	next, err := s.store.Update(cur)
 	return toAppSettings(next), err
 }

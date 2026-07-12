@@ -45,6 +45,8 @@ erDiagram
     BOOK ||--o| READING_STATE : tracks
     BOOK ||--o{ ANNOTATION : has
     BOOK ||--o| BOOK_FTS : indexes
+    BOOK ||--o| CONTENT_INDEX : content
+    BOOK ||--o| CONTENT_FTS : searches
 
     AUTHOR {
         INTEGER id PK
@@ -130,6 +132,22 @@ erDiagram
         TEXT tags
     }
 
+    CONTENT_INDEX {
+        INTEGER book_id PK
+        INTEGER file_id FK
+        TEXT status
+        INTEGER chars
+        TEXT error
+        TEXT indexed_at
+    }
+
+    CONTENT_FTS {
+        INTEGER book_id
+        INTEGER ordinal
+        INTEGER page
+        TEXT body
+    }
+
     SCHEMA_VERSION {
         INTEGER version
     }
@@ -185,10 +203,17 @@ show the foreign-key links.
   `rules_json` stores the ordered rule list as JSON. Membership is evaluated at
   read time by the app layer, because some predicates depend on connected-reader
   state (`on_device`). Added in migration `0005`.
+- **`content_index`** — per-book status for the extracted-text index:
+  `indexed`, `empty` or `failed`, the source `file_id`, character count, last
+  error and `indexed_at`. Added in migration `0006`.
+- **`content_fts`** — FTS5 virtual table storing extracted EPUB/PDF body text
+  as one row per searchable fragment. `book_id`, `ordinal` and `page` are
+  unindexed columns used to group snippets by book and order occurrences inside
+  a book. Added in migration `0006`, reshaped by `0007`.
 
 Deleting a book cascades to `book_author`, `book_tag`, `file`, `reading_state`
-and `annotation` (via `ON DELETE CASCADE`); its `book_fts` row is removed
-explicitly in the same transaction. Deleting a series sets dependent
+`annotation` and `content_index` (via `ON DELETE CASCADE`); its `book_fts` and
+`content_fts` rows are removed explicitly in the same transaction. Deleting a series sets dependent
 `book.series_id` to NULL.
 
 ### Sorting conventions
@@ -200,7 +225,12 @@ NOCASE`. Series listings order by `series_index` first.
 ## Full-text search (FTS5)
 
 `book_fts` is an FTS5 virtual table with columns `title, authors, series, tags`
-and `rowid = book.id`. Two decisions worth noting:
+and `rowid = book.id`. `content_fts` is a separate FTS5 virtual table with
+`body` plus unindexed `book_id`, `ordinal` and `page`, enabled by the
+user-facing "Recherche plein texte" setting. Keeping the indexes separate lets
+metadata search stay fast and ranked well, while extracted book text can be
+rebuilt independently and returned as contextual snippets. Two decisions worth
+noting:
 
 - **Standard (content-storing) FTS5 table, not `content=''`.** A contentless
   table forbids ordinary `UPDATE`/`DELETE`, which would make re-indexing a book

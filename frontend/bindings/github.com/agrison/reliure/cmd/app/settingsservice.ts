@@ -32,6 +32,20 @@ export function Get(): $CancellablePromise<$models.AppSettings> {
 }
 
 /**
+ * SetContentSearchContext stores how much context content search snippets show.
+ */
+export function SetContentSearchContext(mode: string): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(1852183188, mode);
+}
+
+/**
+ * SetContentSearchEnabled toggles indexing/searching inside ebook contents.
+ */
+export function SetContentSearchEnabled(enabled: boolean): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(1476825158, enabled);
+}
+
+/**
  * SetFeatureDiscover toggles the Project Gutenberg discovery view.
  */
 export function SetFeatureDiscover(enabled: boolean): $CancellablePromise<$models.AppSettings> {
@@ -51,6 +65,14 @@ export function SetFeatureSmartShelves(enabled: boolean): $CancellablePromise<$m
  */
 export function SetImportMode(mode: string): $CancellablePromise<$models.AppSettings> {
     return $Call.ByID(4033158262, mode);
+}
+
+/**
+ * SetLanguage sets the UI language. Unknown values are normalized to French by
+ * the settings store.
+ */
+export function SetLanguage(language: string): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(1524795262, language);
 }
 
 /**

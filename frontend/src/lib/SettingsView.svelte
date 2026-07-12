@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { AppSettings, OPDSStatus, CalibreStatus } from "./api";
+  import { languageOptions, t, type Locale } from "./i18n";
 
   let {
     settings,
@@ -19,8 +20,12 @@
     onSetWatchFolderEnabled,
     onSetWatchFolderDelay,
     onSetWatchFolderDelete,
+    onSetContentSearchEnabled,
+    onSetContentSearchContext,
+    onReindexContent,
     onRegenerateCovers,
     onSetTheme,
+    onSetLanguage,
     onChooseKoreader,
     onSyncKoreader,
     onSyncKoreaderFromDevice,
@@ -43,21 +48,31 @@
     onSetWatchFolderEnabled: (enabled: boolean) => Promise<void> | void;
     onSetWatchFolderDelay: (seconds: number) => Promise<void> | void;
     onSetWatchFolderDelete: (enabled: boolean) => Promise<void> | void;
+    onSetContentSearchEnabled: (enabled: boolean) => Promise<void> | void;
+    onSetContentSearchContext: (mode: "minimal" | "phrase" | "paragraph") => Promise<void> | void;
+    onReindexContent: () => Promise<void> | void;
     onRegenerateCovers: () => Promise<void> | void;
     onSetTheme: (theme: "system" | "light" | "dark") => void;
+    onSetLanguage: (language: Locale) => void;
     onChooseKoreader: () => Promise<void> | void;
     onSyncKoreader: () => Promise<void> | void;
     onSyncKoreaderFromDevice: () => Promise<void> | void;
     syncingKoreader: boolean;
   } = $props();
 
-  const themes: { value: "system" | "light" | "dark"; label: string }[] = [
-    { value: "system", label: "Auto" },
-    { value: "light", label: "Clair" },
-    { value: "dark", label: "Sombre" },
+  const themes: { value: "system" | "light" | "dark"; labelKey: Parameters<typeof t>[0] }[] = [
+    { value: "system", labelKey: "settings.theme.system" },
+    { value: "light", labelKey: "settings.theme.light" },
+    { value: "dark", labelKey: "settings.theme.dark" },
+  ];
+  const contentContexts: { value: "minimal" | "phrase" | "paragraph"; labelKey: Parameters<typeof t>[0] }[] = [
+    { value: "minimal", labelKey: "settings.content.context.minimal" },
+    { value: "phrase", labelKey: "settings.content.context.phrase" },
+    { value: "paragraph", labelKey: "settings.content.context.paragraph" },
   ];
 
   let regenerating = $state(false);
+  let reindexingContent = $state(false);
   let remotePathTemplate = $state("");
   let opdsPort = $state("");
 
@@ -73,6 +88,16 @@
       await onRegenerateCovers();
     } finally {
       regenerating = false;
+    }
+  }
+
+  async function reindexContent() {
+    if (reindexingContent) return;
+    reindexingContent = true;
+    try {
+      await onReindexContent();
+    } finally {
+      reindexingContent = false;
     }
   }
 
@@ -96,8 +121,8 @@
   <section class="section">
     <div class="section-head">
       <div>
-        <h2>Réseau</h2>
-        <p>Services utilisés par KOReader pour récupérer ou recevoir les livres.</p>
+        <h2>{t("settings.network.title", settings.language)}</h2>
+        <p>{t("settings.network.description", settings.language)}</p>
       </div>
     </div>
 
@@ -106,9 +131,9 @@
         <div class="panel-head">
           <div>
             <h3>OPDS</h3>
-            <p>Catalogue WiFi consultable depuis KOReader.</p>
+            <p>{t("settings.opds.description", settings.language)}</p>
           </div>
-          <span class="status" class:on={opdsStatus.running}>{opdsStatus.running ? "En ligne" : "Arrêté"}</span>
+          <span class="status" class:on={opdsStatus.running}>{opdsStatus.running ? t("common.online", settings.language) : t("common.offline", settings.language)}</span>
         </div>
 
         <label class="toggle">
@@ -117,11 +142,11 @@
             checked={opdsStatus.enabled}
             onchange={(e) => onSetOPDSEnabled((e.target as HTMLInputElement).checked)}
           />
-          <span>Activer le catalogue</span>
+          <span>{t("settings.opds.enable", settings.language)}</span>
         </label>
 
         <div class="field-row">
-          <label for="opds-port">Port</label>
+          <label for="opds-port">{t("settings.port", settings.language)}</label>
           <input
             id="opds-port"
             class="port"
@@ -148,11 +173,11 @@
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h3>Liseuse</h3>
-            <p>Serveur Calibre wireless pour l’envoi direct vers KOReader.</p>
+            <h3>{t("settings.reader.title", settings.language)}</h3>
+            <p>{t("settings.reader.description", settings.language)}</p>
           </div>
           <span class="status" class:on={calibre?.connected ?? false}>
-            {calibre?.connected ? "Connectée" : calibre?.running ? "En attente" : "Arrêté"}
+            {calibre?.connected ? t("status.connected.lower", settings.language) : calibre?.running ? t("status.waiting.lower", settings.language) : t("status.stopped.lower", settings.language)}
           </span>
         </div>
 
@@ -162,16 +187,16 @@
             checked={calibre?.running ?? false}
             onchange={(e) => onSetCalibreEnabled((e.target as HTMLInputElement).checked)}
           />
-          <span>Activer l’envoi vers la liseuse</span>
+          <span>{t("settings.reader.enable", settings.language)}</span>
         </label>
 
         {#if calibre?.running}
-          <p class="hint">Dans KOReader : Calibre → connexion sans fil. Si la découverte automatique échoue, utilisez cette adresse.</p>
+          <p class="hint">{t("settings.reader.koreaderHint", settings.language)}</p>
           <div class="path-row">
             <span class="path ellipsis" title={calibre.address}>{calibre.address || `port ${calibre.port}`}</span>
           </div>
           {#if calibre.connected && calibre.device}
-            <p class="hint">Appareil connecté : {calibre.device}</p>
+            <p class="hint">{t("settings.reader.connectedDevice", settings.language, { device: calibre.device })}</p>
           {/if}
         {/if}
       </article>
@@ -181,8 +206,8 @@
   <section class="section">
     <div class="section-head">
       <div>
-        <h2>Bibliothèque</h2>
-        <p>Import, organisation locale, chemin KOReader et maintenance des couvertures.</p>
+        <h2>{t("settings.library.title", settings.language)}</h2>
+        <p>{t("settings.library.description", settings.language)}</p>
       </div>
     </div>
 
@@ -190,19 +215,19 @@
       <article class="panel wide">
         <div class="panel-head">
           <div>
-            <h3>Import</h3>
-            <p>Définit si Reliure copie les fichiers ou les référence sur place.</p>
+            <h3>{t("settings.import.title", settings.language)}</h3>
+            <p>{t("settings.import.description", settings.language)}</p>
           </div>
         </div>
 
-        <div class="seg" role="radiogroup" aria-label="Mode d'import">
+        <div class="seg" role="radiogroup" aria-label={t("settings.import.mode", settings.language)}>
           <button
             class="seg-btn"
             class:active={settings.importMode === "copy"}
             aria-pressed={settings.importMode === "copy"}
             onclick={() => onSetMode("copy")}
           >
-            Copier dans la bibliothèque
+            {t("settings.import.copy", settings.language)}
           </button>
           <button
             class="seg-btn"
@@ -210,39 +235,39 @@
             aria-pressed={settings.importMode === "reference"}
             onclick={() => onSetMode("reference")}
           >
-            Indexer sur place
+            {t("settings.import.reference", settings.language)}
           </button>
         </div>
 
         {#if settings.importMode === "copy"}
           <div class="path-row">
             <span class="path ellipsis" title={settings.libraryDir}>{settings.libraryDir}</span>
-            <button class="link" onclick={onChooseFolder}>Modifier…</button>
+            <button class="link" onclick={onChooseFolder}>{t("settings.change", settings.language)}</button>
           </div>
         {:else}
-          <p class="hint">Les fichiers restent à leur emplacement d’origine ; Reliure ne fait que les indexer.</p>
+          <p class="hint">{t("settings.import.referenceHint", settings.language)}</p>
         {/if}
       </article>
 
       <article class="panel wide">
         <div class="panel-head">
           <div>
-            <h3>Dossier surveillé</h3>
-            <p>Importe automatiquement les nouveaux livres déposés dans un dossier.</p>
+            <h3>{t("settings.watch.title", settings.language)}</h3>
+            <p>{t("settings.watch.description", settings.language)}</p>
           </div>
           <span class="status" class:on={settings.watchFolderEnabled && !!settings.watchFolderDir}>
-            {settings.watchFolderEnabled && settings.watchFolderDir ? "actif" : "arrêté"}
+            {settings.watchFolderEnabled && settings.watchFolderDir ? t("common.active", settings.language) : t("common.stopped", settings.language)}
           </span>
         </div>
 
         {#if settings.watchFolderDir}
           <div class="path-row">
             <span class="path ellipsis" title={settings.watchFolderDir}>{settings.watchFolderDir}</span>
-            <button class="link" onclick={onChooseWatchFolder}>Modifier…</button>
-            <button class="link danger-link" onclick={onClearWatchFolder}>Retirer</button>
+            <button class="link" onclick={onChooseWatchFolder}>{t("settings.change", settings.language)}</button>
+            <button class="link danger-link" onclick={onClearWatchFolder}>{t("settings.remove", settings.language)}</button>
           </div>
         {:else}
-          <button class="action" onclick={onChooseWatchFolder}>Choisir un dossier…</button>
+          <button class="action" onclick={onChooseWatchFolder}>{t("settings.chooseFolder", settings.language)}</button>
         {/if}
 
         <div class="watch-options">
@@ -253,11 +278,11 @@
               disabled={!settings.watchFolderDir}
               onchange={(e) => onSetWatchFolderEnabled((e.target as HTMLInputElement).checked)}
             />
-            <span>Surveiller ce dossier</span>
+            <span>{t("settings.watch.enable", settings.language)}</span>
           </label>
 
           <label class="delay-field">
-            <span>Délai</span>
+            <span>{t("settings.watch.delay", settings.language)}</span>
             <input
               type="number"
               min="1"
@@ -268,7 +293,7 @@
                 if (e.key === "Enter") onSetWatchFolderDelay(Number.parseInt((e.target as HTMLInputElement).value, 10));
               }}
             />
-            <span>secondes</span>
+            <span>{t("common.seconds", settings.language)}</span>
           </label>
 
           <label class="toggle">
@@ -278,19 +303,19 @@
               disabled={settings.importMode !== "copy"}
               onchange={(e) => onSetWatchFolderDelete((e.target as HTMLInputElement).checked)}
             />
-            <span>Supprimer la source après import copié</span>
+            <span>{t("settings.watch.deleteSource", settings.language)}</span>
           </label>
         </div>
         {#if settings.importMode !== "copy"}
-          <p class="hint">La suppression de la source est désactivée en mode indexé sur place.</p>
+          <p class="hint">{t("settings.watch.deleteDisabled", settings.language)}</p>
         {/if}
       </article>
 
       <article class="panel wide">
         <div class="panel-head">
           <div>
-            <h3>Chemin KOReader</h3>
-            <p>Modèle de chemin utilisé pour les prochains envois vers la liseuse.</p>
+            <h3>{t("settings.remotePath.title", settings.language)}</h3>
+            <p>{t("settings.remotePath.description", settings.language)}</p>
           </div>
         </div>
 
@@ -302,14 +327,14 @@
             if (e.key === "Enter") saveTemplate();
           }}
         />
-        <p class="hint">Variables : {`{authors}`}, {`{series}`}, {`{series_index}`}, {`{title}`}, {`{tags}`}, {`{language}`}.</p>
+        <p class="hint">{t("settings.remotePath.variables", settings.language)}</p>
       </article>
 
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h3>Métadonnées EPUB</h3>
-            <p>Option avancée pour synchroniser les fichiers avec la base Reliure.</p>
+            <h3>{t("settings.epubMetadata.title", settings.language)}</h3>
+            <p>{t("settings.epubMetadata.description", settings.language)}</p>
           </div>
         </div>
 
@@ -319,53 +344,88 @@
             checked={settings.writeMetadataToFile}
             onchange={(e) => onSetWriteMetadataToFile((e.target as HTMLInputElement).checked)}
           />
-          <span>Écrire dans le fichier EPUB</span>
+          <span>{t("settings.epubMetadata.write", settings.language)}</span>
         </label>
-        <p class="hint">Modifie le fichier sur disque. En mode indexé sur place, cela édite les originaux.</p>
+        <p class="hint">{t("settings.epubMetadata.warning", settings.language)}</p>
       </article>
 
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h3>Vignettes</h3>
-            <p>Reconstruit les couvertures absentes dans le cache local.</p>
+            <h3>{t("settings.covers.title", settings.language)}</h3>
+            <p>{t("settings.covers.description", settings.language)}</p>
           </div>
         </div>
 
         <button class="action" onclick={regenerate} disabled={regenerating}>
-          {regenerating ? "Génération…" : "Régénérer les vignettes"}
+          {regenerating ? t("settings.covers.generating", settings.language) : t("settings.covers.regenerate", settings.language)}
         </button>
       </article>
 
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h3>Lecture (KOReader)</h3>
-            <p>Importe la progression, le statut et les surlignages depuis les fichiers <code>.sdr</code> de la liseuse.</p>
+            <h3>{t("settings.content.title", settings.language)}</h3>
+            <p>{t("settings.content.description", settings.language)}</p>
           </div>
         </div>
 
-        <div class="subhead">Depuis la liseuse connectée (WiFi)</div>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={settings.contentSearchEnabled}
+            onchange={(e) => onSetContentSearchEnabled((e.target as HTMLInputElement).checked)}
+          />
+          <span>{t("settings.content.enable", settings.language)}</span>
+        </label>
+        <div class="seg context" role="radiogroup" aria-label={t("settings.content.context", settings.language)}>
+          {#each contentContexts as c}
+            <button
+              class="seg-btn"
+              class:active={(settings.contentSearchContext || "minimal") === c.value}
+              aria-pressed={(settings.contentSearchContext || "minimal") === c.value}
+              onclick={() => onSetContentSearchContext(c.value)}
+              disabled={!settings.contentSearchEnabled}
+            >
+              {t(c.labelKey, settings.language)}
+            </button>
+          {/each}
+        </div>
+        <button class="action secondary-action" onclick={reindexContent} disabled={!settings.contentSearchEnabled || reindexingContent}>
+          {reindexingContent ? t("settings.content.indexing", settings.language) : t("settings.content.reindex", settings.language)}
+        </button>
+        <p class="hint">{t("settings.content.hint", settings.language)}</p>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>{t("settings.koreader.title", settings.language)}</h3>
+            <p>{t("settings.koreader.description", settings.language)}</p>
+          </div>
+        </div>
+
+        <div class="subhead">{t("settings.koreader.fromWifi", settings.language)}</div>
         {#if calibre?.connected}
           <button class="action" onclick={onSyncKoreaderFromDevice} disabled={syncingKoreader}>
-            {syncingKoreader ? "Synchronisation…" : `Synchroniser depuis ${calibre.device || "la liseuse"}`}
+            {syncingKoreader ? t("settings.koreader.syncing", settings.language) : t("settings.koreader.syncFrom", settings.language, { device: calibre.device || t("settings.reader.title", settings.language).toLowerCase() })}
           </button>
         {:else}
-          <button class="action" disabled>Aucune liseuse connectée</button>
-          <p class="hint">Ouvrez « Calibre » dans KOReader et connectez-vous au serveur (section Réseau ci-dessus), puis revenez ici.</p>
+          <button class="action" disabled>{t("settings.koreader.noReader", settings.language)}</button>
+          <p class="hint">{t("settings.koreader.noReaderHint", settings.language)}</p>
         {/if}
 
-        <div class="subhead">Depuis un dossier (USB / synchronisé)</div>
+        <div class="subhead">{t("settings.koreader.fromFolder", settings.language)}</div>
         {#if settings.koreaderSyncDir}
           <div class="path-row"><span class="path ellipsis" title={settings.koreaderSyncDir}>{settings.koreaderSyncDir}</span></div>
         {/if}
         <div class="btnrow">
           <button class="action" onclick={onChooseKoreader} disabled={syncingKoreader}>
-            {syncingKoreader ? "Synchronisation…" : settings.koreaderSyncDir ? "Changer de dossier…" : "Choisir un dossier…"}
+            {syncingKoreader ? t("settings.koreader.syncing", settings.language) : settings.koreaderSyncDir ? t("settings.koreader.changeFolder", settings.language) : t("settings.chooseFolder", settings.language)}
           </button>
           {#if settings.koreaderSyncDir}
             <button class="action ghost" onclick={onSyncKoreader} disabled={syncingKoreader}>
-              {syncingKoreader ? "…" : "Resynchroniser"}
+              {syncingKoreader ? "..." : t("settings.koreader.resync", settings.language)}
             </button>
           {/if}
         </div>
@@ -376,8 +436,8 @@
   <section class="section">
     <div class="section-head">
       <div>
-        <h2>Fonctionnalités</h2>
-        <p>Modules optionnels affichés dans la barre latérale.</p>
+        <h2>{t("settings.features.title", settings.language)}</h2>
+        <p>{t("settings.features.description", settings.language)}</p>
       </div>
     </div>
 
@@ -385,8 +445,8 @@
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h3>Découvrir</h3>
-            <p>Recherche et import depuis Project Gutenberg.</p>
+            <h3>{t("settings.features.discover.title", settings.language)}</h3>
+            <p>{t("settings.features.discover.description", settings.language)}</p>
           </div>
         </div>
         <label class="toggle">
@@ -395,15 +455,15 @@
             checked={settings.featureDiscover}
             onchange={(e) => onSetFeatureDiscover((e.target as HTMLInputElement).checked)}
           />
-          <span>Afficher Découvrir</span>
+          <span>{t("settings.features.discover.show", settings.language)}</span>
         </label>
       </article>
 
       <article class="panel">
         <div class="panel-head">
           <div>
-            <h3>Étagères intelligentes</h3>
-            <p>Collections dynamiques basées sur des règles.</p>
+            <h3>{t("settings.features.shelves.title", settings.language)}</h3>
+            <p>{t("settings.features.shelves.description", settings.language)}</p>
           </div>
         </div>
         <label class="toggle">
@@ -412,7 +472,7 @@
             checked={settings.featureSmartShelves}
             onchange={(e) => onSetFeatureSmartShelves((e.target as HTMLInputElement).checked)}
           />
-          <span>Afficher les étagères</span>
+          <span>{t("settings.features.shelves.show", settings.language)}</span>
         </label>
       </article>
     </div>
@@ -421,22 +481,31 @@
   <section class="section compact">
     <div class="section-head">
       <div>
-        <h2>Apparence</h2>
-        <p>Thème de l’interface.</p>
+        <h2>{t("settings.appearance.title", settings.language)}</h2>
+        <p>{t("settings.appearance.description", settings.language)}</p>
       </div>
     </div>
-    <div class="seg appearance" role="radiogroup" aria-label="Thème">
-      {#each themes as t}
+    <div class="field-label">{t("settings.theme.label", settings.language)}</div>
+    <div class="seg appearance" role="radiogroup" aria-label={t("settings.theme.label", settings.language)}>
+      {#each themes as theme}
         <button
           class="seg-btn"
-          class:active={(settings.theme || "system") === t.value}
-          aria-pressed={(settings.theme || "system") === t.value}
-          onclick={() => onSetTheme(t.value)}
+          class:active={(settings.theme || "system") === theme.value}
+          aria-pressed={(settings.theme || "system") === theme.value}
+          onclick={() => onSetTheme(theme.value)}
         >
-          {t.label}
+          {t(theme.labelKey, settings.language)}
         </button>
       {/each}
     </div>
+    <label class="select-field">
+      <span>{t("settings.language.label", settings.language)}</span>
+      <select value={settings.language || "fr"} onchange={(e) => onSetLanguage((e.target as HTMLSelectElement).value as Locale)}>
+        {#each languageOptions as lang}
+          <option value={lang.value}>{lang.label}</option>
+        {/each}
+      </select>
+    </label>
   </section>
 </div>
 
@@ -629,6 +698,24 @@
   .seg.appearance {
     max-width: 360px;
   }
+  .field-label,
+  .select-field span {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .select-field {
+    display: block;
+    margin-top: 1rem;
+  }
+  .select-field select {
+    width: min(100%, 360px);
+  }
+  .seg.context {
+    margin-top: 0.85rem;
+  }
   .seg-btn {
     min-width: 0;
     padding: 0.55rem 0.5rem;
@@ -663,6 +750,9 @@
   .action:hover:not(:disabled) {
     background: var(--surface-hi);
     border-color: var(--border-hi);
+  }
+  .secondary-action {
+    margin-top: 0.85rem;
   }
   .action:disabled {
     cursor: default;

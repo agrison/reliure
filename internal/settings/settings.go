@@ -37,6 +37,8 @@ type Settings struct {
 	WriteMetadataToFile bool `json:"writeMetadataToFile"`
 	// Theme is the UI appearance: "system" (follow the OS), "light" or "dark".
 	Theme string `json:"theme"`
+	// Language is the UI locale. French is the source language and fallback.
+	Language string `json:"language"`
 	// KoreaderSyncDir is the last folder scanned for KOReader `.sdr` sidecars
 	// (a mounted device or a synced copy of the reader's library), remembered so
 	// re-syncing reading progress is one click.
@@ -58,6 +60,12 @@ type Settings struct {
 	// WatchFolderDeleteSource removes the source file after a successful copy
 	// import. It is ignored in reference mode.
 	WatchFolderDeleteSource bool `json:"watchFolderDeleteSource"`
+	// ContentSearchEnabled controls whether Reliure extracts and searches text
+	// inside ebook files in addition to metadata.
+	ContentSearchEnabled bool `json:"contentSearchEnabled"`
+	// ContentSearchContext controls how much text is shown around content search
+	// matches: "minimal", "phrase" or "paragraph".
+	ContentSearchContext string `json:"contentSearchContext"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.
@@ -136,10 +144,20 @@ func (s *Store) normalize(in Settings) Settings {
 	if in.WatchFolderDelaySeconds <= 0 {
 		in.WatchFolderDelaySeconds = 10
 	}
+	switch in.ContentSearchContext {
+	case "minimal", "phrase", "paragraph":
+	default:
+		in.ContentSearchContext = "minimal"
+	}
 	switch in.Theme {
 	case "system", "light", "dark":
 	default:
 		in.Theme = "system"
+	}
+	switch in.Language {
+	case "fr", "en", "de", "es", "it":
+	default:
+		in.Language = "fr"
 	}
 	return in
 }

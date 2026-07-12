@@ -1,5 +1,6 @@
 <script lang="ts">
   import { StatsService } from "./api";
+  import { t } from "./i18n";
   import type { Dashboard, NameCount } from "./api";
   import type { ReadingStatus } from "./types";
 
@@ -47,17 +48,14 @@
     return total > 0 ? (part / total) * 100 : 0;
   }
 
-  const langNames: Record<string, string> = {
-    fr: "Français", en: "Anglais", de: "Allemand", es: "Espagnol", it: "Italien",
-    nl: "Néerlandais", pt: "Portugais", ru: "Russe", ja: "Japonais", la: "Latin", zh: "Chinois",
-  };
   function langLabel(code: string): string {
-    return langNames[code] ?? (code === "Autres" ? "Autres" : code.toUpperCase());
+    const key = `language.${code}` as Parameters<typeof t>[0];
+    return code === "Autres" ? t("language.other") : t(key) || code.toUpperCase();
   }
   function monthLabel(m: string): string {
     const [y, mo] = m.split("-");
-    const names = ["", "jan", "fév", "mar", "avr", "mai", "juin", "juil", "aoû", "sep", "oct", "nov", "déc"];
-    return `${names[Number(mo)] ?? mo} ${y.slice(2)}`;
+    const month = Number(mo);
+    return `${month >= 1 && month <= 12 ? t(`month.${month}` as Parameters<typeof t>[0]) : mo} ${y.slice(2)}`;
   }
 
   load();
@@ -65,49 +63,70 @@
 
 <div class="dash">
   {#if loading && !d}
-    <p class="msg">Chargement…</p>
+    <p class="msg">{t("common.loading")}</p>
   {:else if !d}
-    <p class="msg">Statistiques indisponibles.</p>
+    <p class="msg">{t("dashboard.unavailable")}</p>
   {:else}
     <div class="tiles">
-      <div class="tile"><span class="tnum">{fr(d.books)}</span><span class="tlbl">Livres</span></div>
-      <div class="tile"><span class="tnum">{humanSize(d.totalSize)}</span><span class="tlbl">{fr(d.files)} fichier{d.files === 1 ? "" : "s"}</span></div>
-      <div class="tile"><span class="tnum">{fr(d.authors)}</span><span class="tlbl">Auteurs</span></div>
-      <div class="tile"><span class="tnum">{fr(d.series)}</span><span class="tlbl">Séries</span></div>
-      <div class="tile"><span class="tnum">{fr(d.tags)}</span><span class="tlbl">Tags</span></div>
+      <div class="tile"><span class="tnum">{fr(d.books)}</span><span class="tlbl">{t("dashboard.books")}</span></div>
+      <div class="tile"><span class="tnum">{humanSize(d.totalSize)}</span><span class="tlbl">{fr(d.files)} {t(d.files === 1 ? "common.file" : "common.files")}</span></div>
+      <div class="tile"><span class="tnum">{fr(d.authors)}</span><span class="tlbl">{t("dashboard.authors")}</span></div>
+      <div class="tile"><span class="tnum">{fr(d.series)}</span><span class="tlbl">{t("dashboard.series")}</span></div>
+      <div class="tile"><span class="tnum">{fr(d.tags)}</span><span class="tlbl">{t("dashboard.tags")}</span></div>
       {#if d.onDevice > 0}
-        <div class="tile"><span class="tnum">{fr(d.onDevice)}</span><span class="tlbl">Sur liseuse</span></div>
+        <div class="tile"><span class="tnum">{fr(d.onDevice)}</span><span class="tlbl">{t("dashboard.onReader")}</span></div>
       {/if}
       {#if d.annotations > 0}
-        <div class="tile"><span class="tnum">{fr(d.annotations)}</span><span class="tlbl">Surlignages</span></div>
+        <div class="tile"><span class="tnum">{fr(d.annotations)}</span><span class="tlbl">{t("dashboard.annotations")}</span></div>
+      {/if}
+      {#if d.content?.enabled}
+        <div class="tile"><span class="tnum">{fr(d.content.indexedBooks)}</span><span class="tlbl">{t("dashboard.indexedBooks")}</span></div>
       {/if}
     </div>
 
     <div class="cards">
+      {#if d.content?.enabled}
+        <section class="card wide">
+          <h3>{t("dashboard.content.title")}</h3>
+          <div class="contentstats">
+            <span><b>{fr(d.content.indexedBooks)}</b> {t("dashboard.content.indexed")}</span>
+            <span><b>{fr(d.content.pendingBooks)}</b> {t("dashboard.content.pending")}</span>
+            <span><b>{fr(d.content.emptyBooks)}</b> {t("dashboard.content.empty")}</span>
+            <span><b>{fr(d.content.failedBooks)}</b> {t("dashboard.content.failed")}</span>
+            <span><b>{fr(d.content.indexedChars)}</b> {t("dashboard.content.chars")}</span>
+          </div>
+          {#if d.books > 0}
+            <div class="indexbar" role="img" aria-label={t("dashboard.content.coverage")}>
+              <div class="indexed" style="width:{pct(d.content.indexedBooks, d.books)}%"></div>
+            </div>
+          {/if}
+        </section>
+      {/if}
+
       <!-- Reading breakdown: a labelled status bar (identity never color-alone). -->
       <section class="card wide">
-        <h3>Lecture</h3>
+        <h3>{t("dashboard.reading.title")}</h3>
         {#if d.books > 0}
           {@const r = d.reading}
-          <div class="segbar" role="img" aria-label="Répartition par statut de lecture">
-            {#if r.complete}<div class="seg complete" style="flex:{r.complete}" title="Terminés : {r.complete}"></div>{/if}
-            {#if r.reading}<div class="seg reading" style="flex:{r.reading}" title="En cours : {r.reading}"></div>{/if}
-            {#if r.abandoned}<div class="seg abandoned" style="flex:{r.abandoned}" title="Abandonnés : {r.abandoned}"></div>{/if}
-            {#if r.unread}<div class="seg unread" style="flex:{r.unread}" title="Non lus : {r.unread}"></div>{/if}
+          <div class="segbar" role="img" aria-label={t("dashboard.reading.distribution")}>
+            {#if r.complete}<div class="seg complete" style="flex:{r.complete}" title="{t('nav.complete')} : {r.complete}"></div>{/if}
+            {#if r.reading}<div class="seg reading" style="flex:{r.reading}" title="{t('nav.reading')} : {r.reading}"></div>{/if}
+            {#if r.abandoned}<div class="seg abandoned" style="flex:{r.abandoned}" title="{t('nav.abandoned')} : {r.abandoned}"></div>{/if}
+            {#if r.unread}<div class="seg unread" style="flex:{r.unread}" title="{t('dashboard.reading.unread')} : {r.unread}"></div>{/if}
           </div>
           <div class="legend">
-            <button class="lg" onclick={() => onSelectStatus("complete")} disabled={!r.complete}><span class="dot complete"></span>Terminés<b>{fr(r.complete)}</b></button>
-            <button class="lg" onclick={() => onSelectStatus("reading")} disabled={!r.reading}><span class="dot reading"></span>En cours<b>{fr(r.reading)}</b></button>
-            <button class="lg" onclick={() => onSelectStatus("abandoned")} disabled={!r.abandoned}><span class="dot abandoned"></span>Abandonnés<b>{fr(r.abandoned)}</b></button>
-            <span class="lg static"><span class="dot unread"></span>Non lus<b>{fr(r.unread)}</b></span>
+            <button class="lg" onclick={() => onSelectStatus("complete")} disabled={!r.complete}><span class="dot complete"></span>{t("nav.complete")}<b>{fr(r.complete)}</b></button>
+            <button class="lg" onclick={() => onSelectStatus("reading")} disabled={!r.reading}><span class="dot reading"></span>{t("nav.reading")}<b>{fr(r.reading)}</b></button>
+            <button class="lg" onclick={() => onSelectStatus("abandoned")} disabled={!r.abandoned}><span class="dot abandoned"></span>{t("nav.abandoned")}<b>{fr(r.abandoned)}</b></button>
+            <span class="lg static"><span class="dot unread"></span>{t("dashboard.reading.unread")}<b>{fr(r.unread)}</b></span>
           </div>
         {:else}
-          <p class="empty">Aucun livre.</p>
+          <p class="empty">{t("dashboard.noBook")}</p>
         {/if}
       </section>
 
       <section class="card">
-        <h3>Formats</h3>
+        <h3>{t("dashboard.formats")}</h3>
         {#each d.formats ?? [] as f (f.name)}
           {@const m = maxCount(d.formats)}
           <div class="bar">
@@ -116,11 +135,11 @@
             <span class="bval">{fr(f.count)}</span>
           </div>
         {/each}
-        {#if !(d.formats ?? []).length}<p class="empty">—</p>{/if}
+        {#if !(d.formats ?? []).length}<p class="empty">{t("common.none")}</p>{/if}
       </section>
 
       <section class="card">
-        <h3>Langues</h3>
+        <h3>{t("dashboard.languages")}</h3>
         {#each d.languages ?? [] as l (l.name)}
           {@const m = maxCount(d.languages)}
           <div class="bar">
@@ -129,11 +148,11 @@
             <span class="bval">{fr(l.count)}</span>
           </div>
         {/each}
-        {#if !(d.languages ?? []).length}<p class="empty">—</p>{/if}
+        {#if !(d.languages ?? []).length}<p class="empty">{t("common.none")}</p>{/if}
       </section>
 
       <section class="card">
-        <h3>Auteurs les plus présents</h3>
+        <h3>{t("dashboard.topAuthors")}</h3>
         {#each d.topAuthors ?? [] as a (a.name)}
           {@const m = maxCount(d.topAuthors)}
           <div class="bar">
@@ -142,12 +161,12 @@
             <span class="bval">{fr(a.count)}</span>
           </div>
         {/each}
-        {#if !(d.topAuthors ?? []).length}<p class="empty">—</p>{/if}
+        {#if !(d.topAuthors ?? []).length}<p class="empty">{t("common.none")}</p>{/if}
       </section>
 
       {#if (d.topTags ?? []).length}
         <section class="card">
-          <h3>Tags les plus utilisés</h3>
+          <h3>{t("dashboard.topTags")}</h3>
           {#each d.topTags as t (t.name)}
             {@const m = maxCount(d.topTags)}
             <div class="bar">
@@ -162,7 +181,7 @@
       {#if (d.addedByMonth ?? []).length > 1}
         {@const mm = maxCount(d.addedByMonth)}
         <section class="card wide">
-          <h3>Ajouts par mois</h3>
+          <h3>{t("dashboard.addedByMonth")}</h3>
           <div class="cols">
             {#each d.addedByMonth as m (m.name)}
               <div class="colgroup" title="{monthLabel(m.name)} : {m.count}">
@@ -177,7 +196,7 @@
 
     {#if (d.recent ?? []).length}
       <section class="recent">
-        <h3>Ajouts récents</h3>
+        <h3>{t("dashboard.recent")}</h3>
         <div class="rrow">
           {#each d.recent as b (b.id)}
             <button class="rbook" onclick={() => onOpenBook(b.id)} title={b.title}>
@@ -259,6 +278,28 @@
     color: var(--faint);
     font-size: 0.85rem;
     margin: 0;
+  }
+  .contentstats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1rem;
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .contentstats b {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .indexbar {
+    height: 8px;
+    margin-top: 0.85rem;
+    border-radius: 999px;
+    background: var(--inset);
+    overflow: hidden;
+  }
+  .indexbar .indexed {
+    height: 100%;
+    background: var(--accent);
   }
 
   /* Horizontal magnitude bars — single hue (identity is the label). */

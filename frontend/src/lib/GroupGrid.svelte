@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SidebarItem } from "./api";
+  import { plural, t } from "./i18n";
 
   let {
     items,
@@ -12,9 +13,9 @@
   } = $props();
 
   const labels = {
-    author: "Auteur",
-    series: "Série",
-    tag: "Tag",
+    author: t("view.author"),
+    series: t("view.series"),
+    tag: t("shelves.field.tag"),
   };
 
   function initials(name: string): string {
@@ -40,7 +41,7 @@
       <div class="body">
         <div class="kind">{labels[kind]}</div>
         <div class="name ellipsis">{item.name}</div>
-        <div class="count">{item.count} livre{item.count === 1 ? "" : "s"}</div>
+        <div class="count">{t("discover.total", undefined, { count: item.count, s: plural(item.count) })}</div>
       </div>
     </button>
   {/each}

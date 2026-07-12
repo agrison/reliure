@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { QuickEditRow, QuickEditSaveResult } from "./api";
+  import { plural, t } from "./i18n";
 
   let {
     rows,
@@ -46,9 +47,9 @@
   }
 
   function validateRow(row: QuickEditRow): string {
-    if (!row.title.trim()) return "Titre obligatoire";
+    if (!row.title.trim()) return t("quick.error.requiredTitle");
     const idx = row.seriesIndex.trim().replace(",", ".");
-    if (idx && Number.isNaN(Number(idx))) return "Index série invalide";
+    if (idx && Number.isNaN(Number(idx))) return t("quick.error.invalidSeriesIndex");
     return "";
   }
 
@@ -82,15 +83,15 @@
 <section class="quick">
   <div class="bar">
     <div class="search">
-      <input bind:value={filter} placeholder="Filtrer les lignes…" aria-label="Filtrer les lignes" />
+      <input bind:value={filter} placeholder={t("quick.filter")} aria-label={t("quick.filter")} />
     </div>
     <span class="count">{visible.length}/{draft.length}</span>
     {#if dirtyCount}
-      <span class="dirty">{dirtyCount} modifié{dirtyCount === 1 ? "" : "s"}</span>
+      <span class="dirty">{t("quick.dirty", undefined, { count: dirtyCount, s: plural(dirtyCount) })}</span>
     {/if}
-    <button class="ghost" onclick={onReload} disabled={saving}>Recharger</button>
+    <button class="ghost" onclick={onReload} disabled={saving}>{t("quick.reload")}</button>
     <button class="save" onclick={save} disabled={saving || dirtyCount === 0}>
-      {saving ? "Sauvegarde…" : "Sauvegarder"}
+      {saving ? t("quick.saving") : t("quick.save")}
     </button>
   </div>
 
@@ -98,17 +99,17 @@
     <table>
       <thead>
         <tr>
-          <th class="id">ID</th>
-          <th>Titre</th>
-          <th>Titre tri</th>
-          <th>Auteurs</th>
-          <th>Série</th>
-          <th class="n">No</th>
-          <th>Tags</th>
-          <th class="short">Langue</th>
-          <th class="date">Date</th>
+          <th class="id">{t("quick.id")}</th>
+          <th>{t("quick.title")}</th>
+          <th>{t("quick.titleSort")}</th>
+          <th>{t("quick.authors")}</th>
+          <th>{t("quick.series")}</th>
+          <th class="n">{t("quick.seriesIndex.short")}</th>
+          <th>{t("quick.tags")}</th>
+          <th class="short">{t("quick.language")}</th>
+          <th class="date">{t("quick.date")}</th>
           <th>ISBN</th>
-          <th class="override">Chemin KOReader</th>
+          <th class="override">{t("quick.koreaderPath")}</th>
         </tr>
       </thead>
       <tbody>

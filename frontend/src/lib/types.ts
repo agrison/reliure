@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 // View is the current library selection driving the main list.
 export type ReadingStatus = "reading" | "complete" | "abandoned";
 
@@ -8,6 +10,7 @@ export type View =
   | { kind: "settings" }
   | { kind: "gutenberg" }
   | { kind: "annotations" }
+  | { kind: "contentOccurrences"; query: string; scope: { kind: string; id: number }; title: string }
   | { kind: "shelves" }
   | { kind: "shelf"; id: number; name: string }
   | { kind: "reading"; status: ReadingStatus }
@@ -16,31 +19,33 @@ export type View =
   | { kind: "tag"; id: number; name: string };
 
 export const readingStatusLabels: Record<ReadingStatus, string> = {
-  reading: "En cours",
-  complete: "Terminés",
-  abandoned: "Abandonnés",
+  reading: t("nav.reading"),
+  complete: t("nav.complete"),
+  abandoned: t("nav.abandoned"),
 };
 
 export function viewTitle(v: View): string {
   switch (v.kind) {
     case "all":
-      return "Tous les livres";
+      return t("nav.allBooks");
     case "dashboard":
-      return "Tableau de bord";
+      return t("nav.dashboard");
     case "quickedit":
-      return "Édition rapide";
+      return t("nav.quickEdit");
     case "settings":
-      return "Réglages";
+      return t("nav.settings");
     case "gutenberg":
-      return "Découvrir";
+      return t("nav.discover");
     case "annotations":
-      return "Annotations";
+      return t("nav.annotations");
+    case "contentOccurrences":
+      return t("content.occurrences.title");
     case "shelves":
-      return "Étagères";
+      return t("nav.shelves");
     case "shelf":
       return v.name;
     case "reading":
-      return readingStatusLabels[v.status];
+      return t(v.status === "reading" ? "nav.reading" : v.status === "complete" ? "nav.complete" : "nav.abandoned");
     case "author":
       return v.name;
     case "series":

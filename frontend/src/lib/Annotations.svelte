@@ -1,6 +1,7 @@
 <script lang="ts">
   import { KOReaderService } from "./api";
   import type { AnnotatedBook } from "./api";
+  import { plural, t } from "./i18n";
 
   let { onOpen }: { onOpen: (id: number) => void } = $props();
 
@@ -33,13 +34,13 @@
 
 <div class="annotations">
   {#if loading}
-    <p class="msg">Chargement…</p>
+    <p class="msg">{t("annotations.loading")}</p>
   {:else if books.length === 0}
-    <p class="msg">Aucune annotation synchronisée pour l’instant.</p>
+    <p class="msg">{t("annotations.empty")}</p>
   {:else}
     {#each books as b (b.bookId)}
       <section class="book">
-        <button class="bookhead" onclick={() => onOpen(b.bookId)} title="Ouvrir la fiche">
+        <button class="bookhead" onclick={() => onOpen(b.bookId)} title={t("annotations.openBook")}>
           <div class="cover">
             {#if b.cover}
               <img src={b.cover} alt="" loading="lazy" />
@@ -50,7 +51,7 @@
           <div class="binfo">
             <div class="btitle ellipsis">{b.title}</div>
             {#if b.authors}<div class="bauth ellipsis">{b.authors}</div>{/if}
-            <div class="bcount">{(b.annotations ?? []).length} surlignage{(b.annotations ?? []).length === 1 ? "" : "s"} / note{(b.annotations ?? []).length === 1 ? "" : "s"}</div>
+            <div class="bcount">{t("annotations.count", undefined, { count: (b.annotations ?? []).length, s: plural((b.annotations ?? []).length) })}</div>
           </div>
         </button>
 

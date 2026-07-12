@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BookCard, DeviceBookState, ReadingCard } from "./api";
+  import { t } from "./i18n";
 
   let {
     books,
@@ -32,9 +33,9 @@
     const pct = Math.round(progress(state) * 100);
     if (state.pages > 0) {
       const page = Math.max(1, Math.round(progress(state) * state.pages));
-      return `${pct} % · page ${page} / ${state.pages}`;
+      return t("book.progressPage", undefined, { pct, page, pages: state.pages });
     }
-    return `${pct} % lu`;
+    return t("book.progressRead", undefined, { pct });
   }
 
   const selected = $derived(new Set(selectedIds));
@@ -57,7 +58,7 @@
 
   function deviceLabel(state: DeviceBookState | undefined): string {
     if (!state || state.status === "unknown") return "";
-    return state.status === "present" ? "Sur liseuse" : "Absent";
+    return state.status === "present" ? t("book.onReader") : t("book.absent");
   }
 </script>
 
@@ -69,7 +70,7 @@
           class="select"
           class:active={selected.has(b.id)}
           onclick={() => onToggleSelect(b.id)}
-          aria-label={selected.has(b.id) ? "Désélectionner" : "Sélectionner"}
+          aria-label={selected.has(b.id) ? t("book.deselect") : t("book.select")}
         >
           {selected.has(b.id) ? "✓" : ""}
         </button>
@@ -90,7 +91,7 @@
             </span>
           {/if}
           {#if readingStates[b.id]?.annotations}
-            <span class="notes" title="{readingStates[b.id].annotations} surlignage(s) / note(s)">✎ {readingStates[b.id].annotations}</span>
+            <span class="notes" title={t("book.noteTitle", undefined, { count: readingStates[b.id].annotations })}>✎ {readingStates[b.id].annotations}</span>
           {/if}
           {#if progress(readingStates[b.id]) > 0}
             <span class="progress" title={progressTitle(readingStates[b.id])}>
@@ -104,7 +105,7 @@
         </div>
         <div class="cap">
           <div class="t ellipsis">{b.title}</div>
-          <div class="a ellipsis">{b.authors || "—"}</div>
+          <div class="a ellipsis">{b.authors || t("common.none")}</div>
         </div>
         </button>
       </div>
@@ -118,7 +119,7 @@
           class="select"
           class:active={selected.has(b.id)}
           onclick={() => onToggleSelect(b.id)}
-          aria-label={selected.has(b.id) ? "Désélectionner" : "Sélectionner"}
+          aria-label={selected.has(b.id) ? t("book.deselect") : t("book.select")}
         >
           {selected.has(b.id) ? "✓" : ""}
         </button>
@@ -132,7 +133,7 @@
         </div>
         <div class="meta">
           <div class="t ellipsis">{b.title}</div>
-          <div class="a ellipsis">{b.authors || "—"}</div>
+          <div class="a ellipsis">{b.authors || t("common.none")}</div>
         </div>
         {#if b.series}
           <div class="series ellipsis">
@@ -150,7 +151,7 @@
         {/if}
         {#if progress(readingStates[b.id]) > 0}
           <span class="readpct" class:done={readingStates[b.id]?.status === "complete"}>
-            {readingStates[b.id]?.status === "complete" ? "Lu" : Math.round(progress(readingStates[b.id]) * 100) + " %"}
+            {readingStates[b.id]?.status === "complete" ? t("book.read") : Math.round(progress(readingStates[b.id]) * 100) + " %"}
           </span>
         {/if}
         <div class="formats">
@@ -184,6 +185,8 @@
     flex-direction: column;
     gap: 0.55rem;
     width: 100%;
+    min-width: 0;
+    overflow: hidden;
     padding: 0;
     border: none;
     background: none;
@@ -316,6 +319,11 @@
     font-size: 0.84rem;
     font-weight: 550;
   }
+  .cap {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
   .cap .a {
     font-size: 0.76rem;
     color: var(--muted);
@@ -407,8 +415,12 @@
   }
 
   .ellipsis {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 </style>

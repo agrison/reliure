@@ -6,6 +6,7 @@ import (
 
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/device"
+	"github.com/agrison/reliure/internal/settings"
 )
 
 // StatsService computes the analytics dashboard. It is read-only and assembles
@@ -13,6 +14,7 @@ import (
 type StatsService struct {
 	db        *core.DB
 	inventory *device.Store
+	settings  *settings.Store
 }
 
 // NameCount is a labelled magnitude for the dashboard's bar charts.
@@ -47,6 +49,16 @@ type Dashboard struct {
 	TopTags      []NameCount      `json:"topTags"`
 	AddedByMonth []NameCount      `json:"addedByMonth"`
 	Recent       []BookCard       `json:"recent"`
+	Content      ContentDashboard `json:"content"`
+}
+
+type ContentDashboard struct {
+	Enabled      bool  `json:"enabled"`
+	IndexedBooks int   `json:"indexedBooks"`
+	EmptyBooks   int   `json:"emptyBooks"`
+	FailedBooks  int   `json:"failedBooks"`
+	PendingBooks int   `json:"pendingBooks"`
+	IndexedChars int64 `json:"indexedChars"`
 }
 
 // Dashboard gathers every statistic shown on the dashboard.
@@ -56,6 +68,21 @@ func (s *StatsService) Dashboard() (Dashboard, error) {
 
 	if d.Books, err = s.db.Books.Count(); err != nil {
 		return d, err
+	}
+	if s.settings != nil && s.settings.Get().ContentSearchEnabled {
+		d.Content.Enabled = true
+		cst, err := s.db.Content.Stats()
+		if err != nil {
+			return d, err
+		}
+		d.Content.IndexedBooks = cst.IndexedBooks
+		d.Content.EmptyBooks = cst.EmptyBooks
+		d.Content.FailedBooks = cst.FailedBooks
+		d.Content.IndexedChars = cst.IndexedChars
+		covered := cst.IndexedBooks + cst.EmptyBooks + cst.FailedBooks
+		if d.Content.PendingBooks = d.Books - covered; d.Content.PendingBooks < 0 {
+			d.Content.PendingBooks = 0
+		}
 	}
 	authorCounts, err := s.db.Authors.Counts()
 	if err != nil {

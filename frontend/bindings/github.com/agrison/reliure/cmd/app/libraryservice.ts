@@ -130,6 +130,14 @@ export function ChooseAndImport(): $CancellablePromise<$models.ImportSummary> {
     return $Call.ByID(1506731901);
 }
 
+export function ContentOccurrences(query: string, scope: $models.SearchScope, page: number, perPage: number): $CancellablePromise<$models.ContentOccurrencePage> {
+    return $Call.ByID(996457703, query, scope, page, perPage);
+}
+
+export function ContentSnippets(query: string, scope: $models.SearchScope, booksLimit: number, hitsPerBook: number): $CancellablePromise<$models.ContentSnippet[] | null> {
+    return $Call.ByID(2289333813, query, scope, booksLimit, hitsPerBook);
+}
+
 /**
  * DeleteSmartShelf removes a shelf definition.
  */
@@ -173,6 +181,15 @@ export function QuickEditRows(): $CancellablePromise<$models.QuickEditRow[] | nu
  */
 export function RegenerateCovers(): $CancellablePromise<$models.CoverResult> {
     return $Call.ByID(1789265036);
+}
+
+/**
+ * ReindexContent extracts text from every indexed ebook file and rebuilds the
+ * content FTS index. It can take time on large libraries, so the UI exposes it
+ * as an explicit maintenance action.
+ */
+export function ReindexContent(): $CancellablePromise<$models.ContentReindexResult> {
+    return $Call.ByID(1692897598);
 }
 
 /**
@@ -223,6 +240,14 @@ export function SearchGutenberg(search: string, languages: string, page: number)
  */
 export function SearchOnlineMetadata(bookID: number, title: string, authors: string, isbn: string, language: string): $CancellablePromise<$models.OnlineSearchResult> {
     return $Call.ByID(3651181984, bookID, title, authors, isbn, language);
+}
+
+/**
+ * SearchScoped returns metadata matches, plus content matches when content
+ * search is enabled, constrained to the current library view.
+ */
+export function SearchScoped(query: string, scope: $models.SearchScope): $CancellablePromise<$models.BookCard[] | null> {
+    return $Call.ByID(3379192954, query, scope);
 }
 
 /**

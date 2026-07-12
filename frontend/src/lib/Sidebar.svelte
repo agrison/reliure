@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SidebarItem, OPDSStatus, CalibreStatus, ReadingStatusCounts, SmartShelfSummary } from "./api";
+  import { t } from "./i18n";
   import type { View, ReadingStatus } from "./types";
 
   let {
@@ -39,9 +40,9 @@
   const readingFilters = $derived(
     (
       [
-        { status: "reading", label: "En cours", count: reading?.reading ?? 0 },
-        { status: "complete", label: "Terminés", count: reading?.complete ?? 0 },
-        { status: "abandoned", label: "Abandonnés", count: reading?.abandoned ?? 0 },
+        { status: "reading", label: t("nav.reading"), count: reading?.reading ?? 0 },
+        { status: "complete", label: t("nav.complete"), count: reading?.complete ?? 0 },
+        { status: "abandoned", label: t("nav.abandoned"), count: reading?.abandoned ?? 0 },
       ] as { status: ReadingStatus; label: string; count: number }[]
     ).filter((f) => f.count > 0),
   );
@@ -56,9 +57,9 @@
 
   type Group = { key: "author" | "series" | "tag"; label: string; items: SidebarItem[] };
   const groups = $derived<Group[]>([
-    { key: "author", label: "Auteurs", items: authors },
-    { key: "series", label: "Séries", items: series },
-    { key: "tag", label: "Tags", items: tags },
+    { key: "author", label: t("nav.authors"), items: authors },
+    { key: "series", label: t("nav.series"), items: series },
+    { key: "tag", label: t("nav.tags"), items: tags },
   ]);
 
   function isActive(kind: "author" | "series" | "tag", id: number): boolean {
@@ -69,18 +70,18 @@
 <aside class="sidebar">
   <div class="brand">
     <img src="/reliure-logo.png" alt="" aria-hidden="true" />
-    <span>Reliure</span>
+    <span>{t("app.name")}</span>
   </div>
 
   <button class="root tool" class:active={active.kind === "dashboard"} onclick={() => onSelect({ kind: "dashboard" })}>
     <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
       <path d="M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-4H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
     </svg>
-    <span>Tableau de bord</span>
+    <span>{t("nav.dashboard")}</span>
   </button>
 
   <button class="root" class:active={active.kind === "all"} onclick={() => onSelect({ kind: "all" })}>
-    <span>Tous les livres</span>
+    <span>{t("nav.allBooks")}</span>
     <span class="count">{total}</span>
   </button>
 
@@ -101,7 +102,7 @@
   {/if}
 
   <button class="root tool" class:active={active.kind === "quickedit"} onclick={() => onSelect({ kind: "quickedit" })}>
-    <span>Édition rapide</span>
+    <span>{t("nav.quickEdit")}</span>
   </button>
 
   {#if showSmartShelves}
@@ -110,7 +111,7 @@
         <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
         <path d="M7 4v16M17 4v16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>
       </svg>
-      <span>Étagères</span>
+      <span>{t("nav.shelves")}</span>
       <span class="count">{shelves.length}</span>
     </button>
   {/if}
@@ -137,7 +138,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15">
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
       </svg>
-      <span>Découvrir</span>
+      <span>{t("nav.discover")}</span>
     </button>
   {/if}
 
@@ -147,7 +148,7 @@
         <path d="M4 19.5V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v9l-6 6H5a1 1 0 0 1-1-1z M14 20v-5a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
         <path d="M8 9h8M8 12.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
-      <span>Annotations</span>
+      <span>{t("nav.annotations")}</span>
       <span class="count">{annotationCount}</span>
     </button>
   {/if}
@@ -179,7 +180,7 @@
               </li>
             {/each}
             {#if g.items.length === 0}
-              <li class="empty">—</li>
+              <li class="empty">{t("common.none")}</li>
             {/if}
           </ul>
         {/if}
@@ -192,10 +193,10 @@
       class="opds"
       class:on={opds.running}
       onclick={onOpenSettings}
-      title={opds.running ? opds.url : opds.error || "Serveur OPDS arrêté"}
+      title={opds.running ? opds.url : opds.error || t("nav.opds.stopped")}
     >
       <span class="dot"></span>
-      <span class="lbl">OPDS {opds.running ? "en ligne" : "arrêté"}</span>
+      <span class="lbl">{t("nav.opds.status", undefined, { status: opds.running ? t("status.online.lower") : t("status.stopped.lower") })}</span>
       {#if opds.running && opds.url}
         <span class="addr ellipsis">{shortURL(opds.url)}</span>
       {/if}
@@ -207,10 +208,10 @@
       class="opds"
       class:on={calibre.connected}
       onclick={onOpenSettings}
-      title={calibre.connected ? `Liseuse connectée : ${calibre.device}` : "Serveur liseuse en attente de connexion"}
+      title={calibre.connected ? t("nav.reader.connectedTitle", undefined, { device: calibre.device }) : t("nav.reader.waitingTitle")}
     >
       <span class="dot"></span>
-      <span class="lbl">Liseuse {calibre.connected ? "connectée" : "en attente"}</span>
+      <span class="lbl">{t("nav.reader.status", undefined, { status: calibre.connected ? t("status.connected.lower") : t("status.waiting.lower") })}</span>
       {#if calibre.connected && calibre.device}
         <span class="addr ellipsis">{calibre.device}</span>
       {:else if calibre.address}
@@ -226,7 +227,7 @@
         fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
         stroke-linejoin="round" /></svg
     >
-    Réglages
+    {t("nav.settings")}
   </button>
 </aside>
 

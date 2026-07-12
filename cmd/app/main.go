@@ -106,12 +106,12 @@ func main() {
 		Services: []application.Service{
 			application.NewService(&App{}),
 			application.NewService(libSvc),
-			application.NewService(&SettingsService{store: store}),
+			application.NewService(&SettingsService{store: store, library: libSvc}),
 			application.NewService(watchFolderSvc),
 			application.NewService(opdsSvc),
 			application.NewService(calibreSvc),
 			application.NewService(&KOReaderService{db: db, store: store}),
-			application.NewService(&StatsService{db: db, inventory: inventoryStore}),
+			application.NewService(&StatsService{db: db, inventory: inventoryStore, settings: store}),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(coverDir),

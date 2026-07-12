@@ -37,6 +37,7 @@ export interface AppSettings {
     "opdsPort": number;
     "writeMetadataToFile": boolean;
     "theme": string;
+    "language": string;
     "koreaderSyncDir": string;
     "featureDiscover": boolean;
     "featureSmartShelves": boolean;
@@ -44,6 +45,8 @@ export interface AppSettings {
     "watchFolderDir": string;
     "watchFolderDelaySeconds": number;
     "watchFolderDeleteSource": boolean;
+    "contentSearchEnabled": boolean;
+    "contentSearchContext": string;
 }
 
 /**
@@ -167,6 +170,42 @@ export interface CalibreStatus {
     "address": string;
 }
 
+export interface ContentDashboard {
+    "enabled": boolean;
+    "indexedBooks": number;
+    "emptyBooks": number;
+    "failedBooks": number;
+    "pendingBooks": number;
+    "indexedChars": number;
+}
+
+export interface ContentOccurrencePage {
+    "total": number;
+    "page": number;
+    "perPage": number;
+    "totalPages": number;
+    "items": ContentSnippet[] | null;
+}
+
+export interface ContentReindexResult {
+    "total": number;
+    "indexed": number;
+    "empty": number;
+    "failed": number;
+}
+
+export interface ContentSnippet {
+    "bookId": number;
+    "title": string;
+    "authors": string;
+    "series": string;
+    "seriesIndex": number;
+    "cover": string;
+    "page": number;
+    "snippet": string;
+    "more": number;
+}
+
 /**
  * Contributor is a named author/role pair for the detail view.
  */
@@ -204,6 +243,7 @@ export interface Dashboard {
     "topTags": NameCount[] | null;
     "addedByMonth": NameCount[] | null;
     "recent": BookCard[] | null;
+    "content": ContentDashboard;
 }
 
 /**
@@ -480,6 +520,11 @@ export interface RemoveBookResult {
     "removedFromIndex": number;
     "trashedFiles": number;
     "keptFiles": number;
+}
+
+export interface SearchScope {
+    "kind": string;
+    "id": number;
 }
 
 /**
