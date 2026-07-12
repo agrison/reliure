@@ -20,6 +20,20 @@ Prebuilt releases are available from the
 - [Windows](https://github.com/agrison/reliure/releases/latest/download/reliure-windows-amd64.zip)
 - [Linux amd64](https://github.com/agrison/reliure/releases/latest/download/reliure-linux-amd64.zip)
 
+## Screenshots
+
+| Feature | Screenshot |
+| --- | --- |
+| Currently reading | <img src="screenshots/currently_reading.png" alt="Currently reading" width="520"> |
+| KOReader currently reading sync | <img src="screenshots/currently_reading_koreader.png" alt="KOReader currently reading sync" width="520"> |
+| KOReader reading details | <img src="screenshots/currently_reading_koreader_details.png" alt="KOReader reading details" width="520"> |
+| Discover | <img src="screenshots/discover.png" alt="Discover" width="520"> |
+| Dynamic shelves | <img src="screenshots/dynamic_shelf.png" alt="Dynamic shelves" width="520"> |
+| Full-text search | <img src="screenshots/fulltext.png" alt="Full-text search" width="520"> |
+| Full-text search results | <img src="screenshots/fulltext2.png" alt="Full-text search results" width="520"> |
+| Full-text search in dark mode | <img src="screenshots/fulltext_dark.png" alt="Full-text search in dark mode" width="520"> |
+| Internationalized interface | <img src="screenshots/ui_another_language.png" alt="Internationalized interface" width="520"> |
+
 ## What Reliure Does
 
 - Builds a local ebook library from files or folders.
