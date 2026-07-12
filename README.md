@@ -11,6 +11,15 @@ It focuses on the everyday workflow around a personal library: importing books,
 fixing metadata, browsing covers, tracking what is already on the reader, and
 moving files to KOReader with the right folder structure.
 
+## Downloads
+
+Prebuilt releases are available from the
+[GitHub Releases page](https://github.com/agrison/reliure/releases).
+
+- [macOS](https://github.com/agrison/reliure/releases/latest/download/reliure-macos-arm64.zip)
+- [Windows](https://github.com/agrison/reliure/releases/latest/download/reliure-windows-amd64.zip)
+- [Linux amd64](https://github.com/agrison/reliure/releases/latest/download/reliure-linux-amd64.zip)
+
 ## What Reliure Does
 
 - Builds a local ebook library from files or folders.
