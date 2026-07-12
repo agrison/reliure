@@ -6,11 +6,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/agrison/reliure/internal/gutenberg"
 	"github.com/agrison/reliure/internal/library"
+	"github.com/agrison/reliure/internal/standardebooks"
 )
 
 // maxGutenbergEPUB caps a downloaded EPUB so a misbehaving mirror can't fill the
@@ -36,6 +38,27 @@ type GutenbergResult struct {
 	HasPrevious bool            `json:"hasPrevious"`
 	Page        int             `json:"page"`
 	Books       []GutenbergBook `json:"books"`
+}
+
+// DiscoverBook is the source-agnostic shape used by the "Découvrir" view.
+type DiscoverBook struct {
+	Source    string   `json:"source"`
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Authors   []string `json:"authors"`
+	Languages []string `json:"languages"`
+	Subjects  []string `json:"subjects"`
+	Cover     string   `json:"cover"`
+	HasEpub   bool     `json:"hasEpub"`
+}
+
+// DiscoverResult is a page of discovery results across one or more providers.
+type DiscoverResult struct {
+	Count       int            `json:"count"`
+	HasNext     bool           `json:"hasNext"`
+	HasPrevious bool           `json:"hasPrevious"`
+	Page        int            `json:"page"`
+	Books       []DiscoverBook `json:"books"`
 }
 
 // SearchGutenberg browses the Project Gutenberg catalogue (via Gutendex).
@@ -76,6 +99,55 @@ func (s *LibraryService) SearchGutenberg(search, languages string, page int) (Gu
 	return out, nil
 }
 
+// SearchDiscover browses legal ebook providers from the single discovery view.
+// source may be "all", "gutenberg" or "standardebooks".
+func (s *LibraryService) SearchDiscover(source, search, languages string, page int) (DiscoverResult, error) {
+	if page < 1 {
+		page = 1
+	}
+	source = normalizeDiscoverSource(source)
+	langs := splitQuickList(languages)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	var out DiscoverResult
+	out.Page = page
+	if source == "all" || source == "gutenberg" {
+		res, err := s.gutenberg.Search(ctx, gutenberg.Query{
+			Search:    search,
+			Languages: langs,
+			Page:      page,
+		})
+		if err != nil {
+			return DiscoverResult{}, err
+		}
+		out.Count += res.Count
+		out.HasNext = out.HasNext || res.HasNext
+		out.HasPrevious = out.HasPrevious || res.HasPrev
+		for _, b := range res.Books {
+			out.Books = append(out.Books, discoverFromGutenberg(b))
+		}
+	}
+	if source == "all" || source == "standardebooks" {
+		res, err := s.standard.Search(ctx, standardebooks.Query{
+			Search:    search,
+			Languages: langs,
+			Page:      page,
+		})
+		if err != nil {
+			return DiscoverResult{}, err
+		}
+		out.Count += res.Count
+		out.HasNext = out.HasNext || res.HasNext
+		out.HasPrevious = out.HasPrevious || res.HasPrev
+		for _, b := range res.Books {
+			out.Books = append(out.Books, discoverFromStandard(b))
+		}
+	}
+	slog.Info("discover search", "source", source, "query", search, "languages", languages, "page", out.Page, "results", len(out.Books))
+	return out, nil
+}
+
 // ImportGutenbergBook downloads a catalogue book's EPUB and imports it into the
 // library. It re-resolves the download URL from Gutendex by id (rather than
 // trusting a client-supplied URL) and always copies into the managed library,
@@ -93,7 +165,11 @@ func (s *LibraryService) ImportGutenbergBook(id int) (ImportSummary, error) {
 		return ImportSummary{}, fmt.Errorf("livre Gutenberg %d introuvable", id)
 	}
 
-	path, err := s.downloadToTemp(ctx, book)
+	body, err := s.gutenberg.Download(ctx, book.ID)
+	if err != nil {
+		return ImportSummary{}, err
+	}
+	path, err := downloadEPUBToTemp(body, fmt.Sprintf("gutenberg-%d-*.epub", book.ID), book.Title)
 	if err != nil {
 		return ImportSummary{}, err
 	}
@@ -103,16 +179,47 @@ func (s *LibraryService) ImportGutenbergBook(id int) (ImportSummary, error) {
 	return s.importPathsMode([]string{path}, library.ModeCopy)
 }
 
-// downloadToTemp streams a book's EPUB into a temporary .epub file and returns
-// its path.
-func (s *LibraryService) downloadToTemp(ctx context.Context, book gutenberg.Book) (string, error) {
-	body, err := s.gutenberg.Download(ctx, book.ID)
-	if err != nil {
-		return "", err
-	}
-	defer body.Close()
+// ImportDiscoverBook downloads a book from a supported discovery provider and
+// imports the EPUB through the normal library pipeline.
+func (s *LibraryService) ImportDiscoverBook(source, id string) (ImportSummary, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
 
-	f, err := os.CreateTemp("", fmt.Sprintf("gutenberg-%d-*.epub", book.ID))
+	switch normalizeDiscoverSource(source) {
+	case "gutenberg":
+		n, err := parsePositiveInt(id)
+		if err != nil {
+			return ImportSummary{}, err
+		}
+		return s.ImportGutenbergBook(n)
+	case "standardebooks":
+		book, ok, err := s.standard.Book(ctx, id)
+		if err != nil {
+			return ImportSummary{}, err
+		}
+		if !ok {
+			return ImportSummary{}, fmt.Errorf("livre Standard Ebooks %q introuvable", id)
+		}
+		body, err := s.standard.Download(ctx, id)
+		if err != nil {
+			return ImportSummary{}, err
+		}
+		path, err := downloadEPUBToTemp(body, "standardebooks-*.epub", book.Title)
+		if err != nil {
+			return ImportSummary{}, err
+		}
+		defer os.Remove(path)
+		slog.Info("standardebooks import", "id", id, "title", book.Title, "from", book.EPUBURL)
+		return s.importPathsMode([]string{path}, library.ModeCopy)
+	default:
+		return ImportSummary{}, fmt.Errorf("source de découverte inconnue: %s", source)
+	}
+}
+
+// downloadEPUBToTemp streams an EPUB into a temporary file and returns its path.
+func downloadEPUBToTemp(body io.ReadCloser, pattern, title string) (string, error) {
+	defer body.Close()
+	f, err := os.CreateTemp("", pattern)
 	if err != nil {
 		return "", err
 	}
@@ -129,7 +236,54 @@ func (s *LibraryService) downloadToTemp(ctx context.Context, book gutenberg.Book
 	}
 	if n == 0 {
 		os.Remove(path)
-		return "", fmt.Errorf("téléchargement vide pour « %s »", strings.TrimSpace(book.Title))
+		return "", fmt.Errorf("téléchargement vide pour « %s »", strings.TrimSpace(title))
 	}
 	return path, nil
+}
+
+func discoverFromGutenberg(b gutenberg.Book) DiscoverBook {
+	return DiscoverBook{
+		Source:    "gutenberg",
+		ID:        fmt.Sprintf("%d", b.ID),
+		Title:     b.Title,
+		Authors:   b.Authors,
+		Languages: b.Languages,
+		Subjects:  b.Subjects,
+		Cover:     b.CoverURL,
+		HasEpub:   b.EPUBURL != "",
+	}
+}
+
+func discoverFromStandard(b standardebooks.Book) DiscoverBook {
+	return DiscoverBook{
+		Source:    "standardebooks",
+		ID:        b.ID,
+		Title:     b.Title,
+		Authors:   b.Authors,
+		Languages: b.Languages,
+		Subjects:  b.Subjects,
+		Cover:     b.CoverURL,
+		HasEpub:   b.EPUBURL != "",
+	}
+}
+
+func normalizeDiscoverSource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "", "all":
+		return "all"
+	case "gutenberg":
+		return "gutenberg"
+	case "standard", "standardebooks", "standard-ebooks":
+		return "standardebooks"
+	default:
+		return source
+	}
+}
+
+func parsePositiveInt(raw string) (int, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("identifiant Gutenberg invalide: %s", raw)
+	}
+	return n, nil
 }

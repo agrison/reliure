@@ -40,6 +40,8 @@ export type {
     CoverResult,
     Dashboard,
     DeviceBookState,
+    DiscoverBook,
+    DiscoverResult,
     FileInfo,
     GutenbergBook,
     GutenbergResult,

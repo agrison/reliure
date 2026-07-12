@@ -262,6 +262,31 @@ export interface DeviceBookState {
 }
 
 /**
+ * DiscoverBook is the source-agnostic shape used by the "Découvrir" view.
+ */
+export interface DiscoverBook {
+    "source": string;
+    "id": string;
+    "title": string;
+    "authors": string[] | null;
+    "languages": string[] | null;
+    "subjects": string[] | null;
+    "cover": string;
+    "hasEpub": boolean;
+}
+
+/**
+ * DiscoverResult is a page of discovery results across one or more providers.
+ */
+export interface DiscoverResult {
+    "count": number;
+    "hasNext": boolean;
+    "hasPrevious": boolean;
+    "page": number;
+    "books": DiscoverBook[] | null;
+}
+
+/**
  * FileInfo describes one file backing a book.
  */
 export interface FileInfo {

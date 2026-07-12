@@ -19,6 +19,7 @@ import (
 	"github.com/agrison/reliure/internal/metadata"
 	"github.com/agrison/reliure/internal/opds"
 	"github.com/agrison/reliure/internal/settings"
+	"github.com/agrison/reliure/internal/standardebooks"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
@@ -60,6 +61,7 @@ func main() {
 		coverDir:  coverDir,
 		meta:      metadata.NewClient(),
 		gutenberg: gutenberg.NewCatalog(filepath.Join(configDir, "gutenberg", "pg_catalog.csv")),
+		standard:  standardebooks.NewCatalog(filepath.Join(configDir, "standardebooks", "repos.json")),
 	}
 	watchFolderSvc := &WatchFolderService{store: store, library: libSvc}
 	watchFolderSvc.startFromSettings()

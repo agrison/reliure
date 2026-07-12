@@ -118,7 +118,7 @@
 </script>
 
 <div class="settings-page">
-  <section class="section">
+  <section class="section network-section">
     <div class="section-head">
       <div>
         <h2>{t("settings.network.title", settings.language)}</h2>
@@ -203,7 +203,7 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section library-section">
     <div class="section-head">
       <div>
         <h2>{t("settings.library.title", settings.language)}</h2>
@@ -433,7 +433,7 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section features-section">
     <div class="section-head">
       <div>
         <h2>{t("settings.features.title", settings.language)}</h2>
@@ -478,39 +478,45 @@
     </div>
   </section>
 
-  <section class="section compact">
+  <section class="section appearance-section">
     <div class="section-head">
       <div>
         <h2>{t("settings.appearance.title", settings.language)}</h2>
         <p>{t("settings.appearance.description", settings.language)}</p>
       </div>
     </div>
-    <div class="field-label">{t("settings.theme.label", settings.language)}</div>
-    <div class="seg appearance" role="radiogroup" aria-label={t("settings.theme.label", settings.language)}>
-      {#each themes as theme}
-        <button
-          class="seg-btn"
-          class:active={(settings.theme || "system") === theme.value}
-          aria-pressed={(settings.theme || "system") === theme.value}
-          onclick={() => onSetTheme(theme.value)}
-        >
-          {t(theme.labelKey, settings.language)}
-        </button>
-      {/each}
+    <div class="appearance-grid">
+      <div>
+        <div class="field-label">{t("settings.theme.label", settings.language)}</div>
+        <div class="seg appearance" role="radiogroup" aria-label={t("settings.theme.label", settings.language)}>
+          {#each themes as theme}
+            <button
+              class="seg-btn"
+              class:active={(settings.theme || "system") === theme.value}
+              aria-pressed={(settings.theme || "system") === theme.value}
+              onclick={() => onSetTheme(theme.value)}
+            >
+              {t(theme.labelKey, settings.language)}
+            </button>
+          {/each}
+        </div>
+      </div>
+      <label class="select-field">
+        <span>{t("settings.language.label", settings.language)}</span>
+        <select value={settings.language || "fr"} onchange={(e) => onSetLanguage((e.target as HTMLSelectElement).value as Locale)}>
+          {#each languageOptions as lang}
+            <option value={lang.value}>{lang.label}</option>
+          {/each}
+        </select>
+      </label>
     </div>
-    <label class="select-field">
-      <span>{t("settings.language.label", settings.language)}</span>
-      <select value={settings.language || "fr"} onchange={(e) => onSetLanguage((e.target as HTMLSelectElement).value as Locale)}>
-        {#each languageOptions as lang}
-          <option value={lang.value}>{lang.label}</option>
-        {/each}
-      </select>
-    </label>
   </section>
 </div>
 
 <style>
   .settings-page {
+    display: flex;
+    flex-direction: column;
     max-width: 1120px;
     margin: 0 auto;
     padding: 1.5rem;
@@ -519,14 +525,19 @@
     padding: 1.25rem 0 1.6rem;
     border-bottom: 1px solid var(--border);
   }
-  .section:first-child {
+  .appearance-section {
+    order: 1;
     padding-top: 0;
   }
-  .section:last-child {
-    border-bottom: none;
+  .features-section {
+    order: 2;
   }
-  .section.compact {
-    max-width: 560px;
+  .library-section {
+    order: 3;
+  }
+  .network-section {
+    order: 4;
+    border-bottom: none;
   }
   .section-head {
     display: flex;
@@ -696,7 +707,13 @@
     border-radius: 10px;
   }
   .seg.appearance {
-    max-width: 360px;
+    width: 100%;
+  }
+  .appearance-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: end;
   }
   .field-label,
   .select-field span {
@@ -708,10 +725,9 @@
   }
   .select-field {
     display: block;
-    margin-top: 1rem;
   }
   .select-field select {
-    width: min(100%, 360px);
+    width: 100%;
   }
   .seg.context {
     margin-top: 0.85rem;
@@ -818,6 +834,9 @@
       padding: 1rem;
     }
     .grid {
+      grid-template-columns: 1fr;
+    }
+    .appearance-grid {
       grid-template-columns: 1fr;
     }
     .watch-options {

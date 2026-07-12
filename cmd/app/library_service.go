@@ -13,6 +13,7 @@ import (
 	"github.com/agrison/reliure/internal/library"
 	"github.com/agrison/reliure/internal/metadata"
 	"github.com/agrison/reliure/internal/settings"
+	"github.com/agrison/reliure/internal/standardebooks"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -39,6 +40,7 @@ type LibraryService struct {
 	coverDir  string
 	meta      *metadata.Client
 	gutenberg *gutenberg.Catalog
+	standard  *standardebooks.Catalog
 	calibre   *CalibreService
 }
 

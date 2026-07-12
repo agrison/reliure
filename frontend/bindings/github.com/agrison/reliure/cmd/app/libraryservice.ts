@@ -146,6 +146,14 @@ export function DeleteSmartShelf(id: number): $CancellablePromise<void> {
 }
 
 /**
+ * ImportDiscoverBook downloads a book from a supported discovery provider and
+ * imports the EPUB through the normal library pipeline.
+ */
+export function ImportDiscoverBook(source: string, id: string): $CancellablePromise<$models.ImportSummary> {
+    return $Call.ByID(1763671349, source, id);
+}
+
+/**
  * ImportGutenbergBook downloads a catalogue book's EPUB and imports it into the
  * library. It re-resolves the download URL from Gutendex by id (rather than
  * trusting a client-supplied URL) and always copies into the managed library,
@@ -222,6 +230,14 @@ export function SaveSmartShelf($in: $models.SmartShelfInput): $CancellablePromis
  */
 export function Search(query: string): $CancellablePromise<$models.BookCard[] | null> {
     return $Call.ByID(2206755262, query);
+}
+
+/**
+ * SearchDiscover browses legal ebook providers from the single discovery view.
+ * source may be "all", "gutenberg" or "standardebooks".
+ */
+export function SearchDiscover(source: string, search: string, languages: string, page: number): $CancellablePromise<$models.DiscoverResult> {
+    return $Call.ByID(4163992081, source, search, languages, page);
 }
 
 /**

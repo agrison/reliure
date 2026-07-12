@@ -67,7 +67,8 @@ Reliure includes tools to improve and complete messy libraries:
 - Online metadata lookup from Google Books, OpenLibrary and the BnF catalog.
 - Per-field metadata merge, so you choose what to keep or replace.
 - Cover replacement from online results.
-- Project Gutenberg discovery and import for public domain books.
+- Discover and import public domain books from [Project Gutenberg](https://www.gutenberg.org/)
+  and [Standard Ebooks](https://standardebooks.org/).
 
 ## Supported Formats
 
