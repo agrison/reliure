@@ -93,7 +93,7 @@
   }
 
   function msg(key: Parameters<typeof t>[0], params?: Parameters<typeof t>[2]): string {
-    return t(key, undefined, params);
+    return t(key, settings?.language ?? "fr", params);
   }
 
   async function loadBooks() {
@@ -141,7 +141,7 @@
       kind: "contentOccurrences",
       query: q,
       scope: searchScope(),
-      title: viewTitle(view),
+      title: viewTitle(view, settings?.language ?? "fr"),
     };
   }
 
@@ -767,6 +767,7 @@
     {calibre}
     reading={readingCounts}
     annotationCount={annotationTotal}
+    language={(settings?.language ?? "fr") as Locale}
     active={view}
     onSelect={selectView}
     onOpenSettings={openSettings}
@@ -783,7 +784,7 @@
             {msg("common.back")}
           </button>
         {/if}
-        <h1>{browseMode === "books" ? viewTitle(view) : browseMode === "author" ? msg("view.authors") : browseMode === "series" ? msg("view.series") : msg("view.tags")}</h1>
+        <h1>{browseMode === "books" ? viewTitle(view, settings?.language ?? "fr") : browseMode === "author" ? msg("view.authors") : browseMode === "series" ? msg("view.series") : msg("view.tags")}</h1>
         {#if view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
           <span class="n">{visibleCount}</span>
         {/if}

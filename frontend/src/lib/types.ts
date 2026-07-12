@@ -1,4 +1,4 @@
-import { t } from "./i18n";
+import { t, type Locale } from "./i18n";
 
 // View is the current library selection driving the main list.
 export type ReadingStatus = "reading" | "complete" | "abandoned";
@@ -24,28 +24,28 @@ export const readingStatusLabels: Record<ReadingStatus, string> = {
   abandoned: t("nav.abandoned"),
 };
 
-export function viewTitle(v: View): string {
+export function viewTitle(v: View, locale?: Locale): string {
   switch (v.kind) {
     case "all":
-      return t("nav.allBooks");
+      return t("nav.allBooks", locale);
     case "dashboard":
-      return t("nav.dashboard");
+      return t("nav.dashboard", locale);
     case "quickedit":
-      return t("nav.quickEdit");
+      return t("nav.quickEdit", locale);
     case "settings":
-      return t("nav.settings");
+      return t("nav.settings", locale);
     case "gutenberg":
-      return t("nav.discover");
+      return t("nav.discover", locale);
     case "annotations":
-      return t("nav.annotations");
+      return t("nav.annotations", locale);
     case "contentOccurrences":
-      return t("content.occurrences.title");
+      return t("content.occurrences.title", locale);
     case "shelves":
-      return t("nav.shelves");
+      return t("nav.shelves", locale);
     case "shelf":
       return v.name;
     case "reading":
-      return t(v.status === "reading" ? "nav.reading" : v.status === "complete" ? "nav.complete" : "nav.abandoned");
+      return t(v.status === "reading" ? "nav.reading" : v.status === "complete" ? "nav.complete" : "nav.abandoned", locale);
     case "author":
       return v.name;
     case "series":

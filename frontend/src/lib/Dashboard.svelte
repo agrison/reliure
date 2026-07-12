@@ -441,6 +441,8 @@
   .rbook {
     flex: 0 0 84px;
     width: 84px;
+    min-width: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -454,6 +456,8 @@
   }
   .rcover {
     width: 84px;
+    max-width: 100%;
+    flex: none;
     aspect-ratio: 2 / 3;
     border-radius: 7px;
     overflow: hidden;
@@ -476,8 +480,12 @@
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
   }
   .rtitle {
+    display: block;
+    width: 100%;
+    min-width: 0;
     font-size: 0.74rem;
     color: var(--muted);
+    line-height: 1.25;
   }
   .ellipsis {
     overflow: hidden;
