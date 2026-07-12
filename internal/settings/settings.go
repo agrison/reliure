@@ -47,6 +47,17 @@ type Settings struct {
 	// FeatureSmartShelves controls whether dynamic rule-based shelves are shown
 	// in the UI.
 	FeatureSmartShelves bool `json:"featureSmartShelves"`
+	// WatchFolderEnabled controls whether Reliure watches WatchFolderDir and
+	// imports new ebook files automatically.
+	WatchFolderEnabled bool `json:"watchFolderEnabled"`
+	// WatchFolderDir is the folder scanned for automatic imports.
+	WatchFolderDir string `json:"watchFolderDir"`
+	// WatchFolderDelaySeconds is the minimum time a new file must remain stable
+	// before being imported.
+	WatchFolderDelaySeconds int `json:"watchFolderDelaySeconds"`
+	// WatchFolderDeleteSource removes the source file after a successful copy
+	// import. It is ignored in reference mode.
+	WatchFolderDeleteSource bool `json:"watchFolderDeleteSource"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.
@@ -121,6 +132,9 @@ func (s *Store) normalize(in Settings) Settings {
 	}
 	if in.OPDSPort <= 0 || in.OPDSPort > 65535 {
 		in.OPDSPort = 8088
+	}
+	if in.WatchFolderDelaySeconds <= 0 {
+		in.WatchFolderDelaySeconds = 10
 	}
 	switch in.Theme {
 	case "system", "light", "dark":

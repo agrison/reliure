@@ -8,6 +8,7 @@ import * as LibraryService from "./libraryservice.js";
 import * as OPDSService from "./opdsservice.js";
 import * as SettingsService from "./settingsservice.js";
 import * as StatsService from "./statsservice.js";
+import * as WatchFolderService from "./watchfolderservice.js";
 export {
     App,
     CalibreService,
@@ -15,7 +16,8 @@ export {
     LibraryService,
     OPDSService,
     SettingsService,
-    StatsService
+    StatsService,
+    WatchFolderService
 };
 
 export type {
@@ -60,5 +62,6 @@ export type {
     SmartShelfDetail,
     SmartShelfInput,
     SmartShelfRule,
-    SmartShelfSummary
+    SmartShelfSummary,
+    WatchFolderStatus
 } from "./models.js";

@@ -14,6 +14,11 @@
     onSetWriteMetadataToFile,
     onSetFeatureDiscover,
     onSetFeatureSmartShelves,
+    onChooseWatchFolder,
+    onClearWatchFolder,
+    onSetWatchFolderEnabled,
+    onSetWatchFolderDelay,
+    onSetWatchFolderDelete,
     onRegenerateCovers,
     onSetTheme,
     onChooseKoreader,
@@ -33,6 +38,11 @@
     onSetWriteMetadataToFile: (enabled: boolean) => void;
     onSetFeatureDiscover: (enabled: boolean) => void;
     onSetFeatureSmartShelves: (enabled: boolean) => void;
+    onChooseWatchFolder: () => Promise<void> | void;
+    onClearWatchFolder: () => Promise<void> | void;
+    onSetWatchFolderEnabled: (enabled: boolean) => Promise<void> | void;
+    onSetWatchFolderDelay: (seconds: number) => Promise<void> | void;
+    onSetWatchFolderDelete: (enabled: boolean) => Promise<void> | void;
     onRegenerateCovers: () => Promise<void> | void;
     onSetTheme: (theme: "system" | "light" | "dark") => void;
     onChooseKoreader: () => Promise<void> | void;
@@ -211,6 +221,68 @@
           </div>
         {:else}
           <p class="hint">Les fichiers restent à leur emplacement d’origine ; Reliure ne fait que les indexer.</p>
+        {/if}
+      </article>
+
+      <article class="panel wide">
+        <div class="panel-head">
+          <div>
+            <h3>Dossier surveillé</h3>
+            <p>Importe automatiquement les nouveaux livres déposés dans un dossier.</p>
+          </div>
+          <span class="status" class:on={settings.watchFolderEnabled && !!settings.watchFolderDir}>
+            {settings.watchFolderEnabled && settings.watchFolderDir ? "actif" : "arrêté"}
+          </span>
+        </div>
+
+        {#if settings.watchFolderDir}
+          <div class="path-row">
+            <span class="path ellipsis" title={settings.watchFolderDir}>{settings.watchFolderDir}</span>
+            <button class="link" onclick={onChooseWatchFolder}>Modifier…</button>
+            <button class="link danger-link" onclick={onClearWatchFolder}>Retirer</button>
+          </div>
+        {:else}
+          <button class="action" onclick={onChooseWatchFolder}>Choisir un dossier…</button>
+        {/if}
+
+        <div class="watch-options">
+          <label class="toggle">
+            <input
+              type="checkbox"
+              checked={settings.watchFolderEnabled}
+              disabled={!settings.watchFolderDir}
+              onchange={(e) => onSetWatchFolderEnabled((e.target as HTMLInputElement).checked)}
+            />
+            <span>Surveiller ce dossier</span>
+          </label>
+
+          <label class="delay-field">
+            <span>Délai</span>
+            <input
+              type="number"
+              min="1"
+              max="3600"
+              value={settings.watchFolderDelaySeconds}
+              onblur={(e) => onSetWatchFolderDelay(Number.parseInt((e.target as HTMLInputElement).value, 10))}
+              onkeydown={(e) => {
+                if (e.key === "Enter") onSetWatchFolderDelay(Number.parseInt((e.target as HTMLInputElement).value, 10));
+              }}
+            />
+            <span>secondes</span>
+          </label>
+
+          <label class="toggle">
+            <input
+              type="checkbox"
+              checked={settings.watchFolderDeleteSource}
+              disabled={settings.importMode !== "copy"}
+              onchange={(e) => onSetWatchFolderDelete((e.target as HTMLInputElement).checked)}
+            />
+            <span>Supprimer la source après import copié</span>
+          </label>
+        </div>
+        {#if settings.importMode !== "copy"}
+          <p class="hint">La suppression de la source est désactivée en mode indexé sur place.</p>
         {/if}
       </article>
 
@@ -533,6 +605,9 @@
   .link:hover {
     text-decoration: underline;
   }
+  .danger-link {
+    color: var(--danger);
+  }
   .hint {
     margin-top: 0.75rem;
   }
@@ -618,6 +693,35 @@
     background: transparent;
     color: var(--muted);
   }
+  .watch-options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: center;
+    margin-top: 0.9rem;
+  }
+  .delay-field {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  .delay-field input {
+    width: 5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--inset);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.84rem;
+    outline: none;
+  }
+  .delay-field input:focus {
+    border-color: var(--border-hi);
+    background: var(--surface-hi);
+  }
 
   @media (max-width: 820px) {
     .settings-page {
@@ -625,6 +729,10 @@
     }
     .grid {
       grid-template-columns: 1fr;
+    }
+    .watch-options {
+      grid-template-columns: 1fr;
+      align-items: flex-start;
     }
   }
 </style>

@@ -79,6 +79,36 @@ func TestUpdateEmptyDirFallsBack(t *testing.T) {
 	}
 }
 
+func TestWatchFolderDefaultsAndDelayNormalization(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	s, err := Open(path, "/default/lib")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.Get()
+	if got.WatchFolderEnabled || got.WatchFolderDir != "" || got.WatchFolderDeleteSource {
+		t.Fatalf("watch folder should be disabled by default: %+v", got)
+	}
+	if got.WatchFolderDelaySeconds != 10 {
+		t.Fatalf("default watch delay = %d, want 10", got.WatchFolderDelaySeconds)
+	}
+
+	got.WatchFolderDelaySeconds = -1
+	got.WatchFolderEnabled = true
+	got.WatchFolderDir = "/drop"
+	got.WatchFolderDeleteSource = true
+	next, err := s.Update(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.WatchFolderDelaySeconds != 10 {
+		t.Fatalf("normalized watch delay = %d, want 10", next.WatchFolderDelaySeconds)
+	}
+	if !next.WatchFolderEnabled || next.WatchFolderDir != "/drop" || !next.WatchFolderDeleteSource {
+		t.Fatalf("watch folder settings not persisted through normalization: %+v", next)
+	}
+}
+
 func TestFeatureTogglesDefaultVisibleButCanBeDisabled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	os.WriteFile(path, []byte(`{"importMode":"copy","libraryDir":"/lib"}`), 0o644)

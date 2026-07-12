@@ -7,6 +7,7 @@
     CalibreService,
     SettingsService,
     KOReaderService,
+    WatchFolderService,
     type BookCard,
     type BookDetail,
     type QuickEditRow,
@@ -514,6 +515,25 @@
     settings = await SettingsService.SetFeatureSmartShelves(enabled);
     if (!enabled && (view.kind === "shelves" || view.kind === "shelf")) selectView({ kind: "all" });
   }
+  async function chooseWatchFolder() {
+    settings = await WatchFolderService.ChooseFolder();
+  }
+  async function clearWatchFolder() {
+    settings = await WatchFolderService.ClearFolder();
+  }
+  async function setWatchFolderEnabled(enabled: boolean) {
+    settings = await WatchFolderService.SetEnabled(enabled);
+  }
+  async function setWatchFolderDelay(seconds: number) {
+    if (!Number.isFinite(seconds)) {
+      settings = await SettingsService.Get();
+      return;
+    }
+    settings = await WatchFolderService.SetDelaySeconds(seconds);
+  }
+  async function setWatchFolderDelete(enabled: boolean) {
+    settings = await WatchFolderService.SetDeleteSource(enabled);
+  }
 
   // applyTheme reflects the choice onto the document: "system" removes the
   // attribute so the OS preference (via CSS) governs; light/dark pin it. The
@@ -782,6 +802,11 @@
             onSetWriteMetadataToFile={setWriteMetadataToFile}
             onSetFeatureDiscover={setFeatureDiscover}
             onSetFeatureSmartShelves={setFeatureSmartShelves}
+            onChooseWatchFolder={chooseWatchFolder}
+            onClearWatchFolder={clearWatchFolder}
+            onSetWatchFolderEnabled={setWatchFolderEnabled}
+            onSetWatchFolderDelay={setWatchFolderDelay}
+            onSetWatchFolderDelete={setWatchFolderDelete}
             onRegenerateCovers={regenerateCovers}
             onSetTheme={setTheme}
             onChooseKoreader={chooseKoreaderAndSync}

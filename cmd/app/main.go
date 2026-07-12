@@ -61,6 +61,10 @@ func main() {
 		meta:      metadata.NewClient(),
 		gutenberg: gutenberg.NewCatalog(filepath.Join(configDir, "gutenberg", "pg_catalog.csv")),
 	}
+	watchFolderSvc := &WatchFolderService{store: store, library: libSvc}
+	watchFolderSvc.startFromSettings()
+	defer watchFolderSvc.shutdown()
+
 	opdsServer := opds.NewServer(opds.NewHandler(opds.HandlerConfig{
 		Catalog:  opds.CoreCatalog{DB: db},
 		CoverDir: coverDir,
@@ -103,6 +107,7 @@ func main() {
 			application.NewService(&App{}),
 			application.NewService(libSvc),
 			application.NewService(&SettingsService{store: store}),
+			application.NewService(watchFolderSvc),
 			application.NewService(opdsSvc),
 			application.NewService(calibreSvc),
 			application.NewService(&KOReaderService{db: db, store: store}),

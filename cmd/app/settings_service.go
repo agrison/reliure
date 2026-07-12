@@ -25,6 +25,10 @@ type AppSettings struct {
 	KoreaderSyncDir     string `json:"koreaderSyncDir"`
 	FeatureDiscover     bool   `json:"featureDiscover"`
 	FeatureSmartShelves bool   `json:"featureSmartShelves"`
+	WatchFolderEnabled  bool   `json:"watchFolderEnabled"`
+	WatchFolderDir      string `json:"watchFolderDir"`
+	WatchFolderDelay    int    `json:"watchFolderDelaySeconds"`
+	WatchFolderDelete   bool   `json:"watchFolderDeleteSource"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
@@ -39,6 +43,10 @@ func toAppSettings(s settings.Settings) AppSettings {
 		KoreaderSyncDir:     s.KoreaderSyncDir,
 		FeatureDiscover:     s.FeatureDiscover,
 		FeatureSmartShelves: s.FeatureSmartShelves,
+		WatchFolderEnabled:  s.WatchFolderEnabled,
+		WatchFolderDir:      s.WatchFolderDir,
+		WatchFolderDelay:    s.WatchFolderDelaySeconds,
+		WatchFolderDelete:   s.WatchFolderDeleteSource,
 	}
 }
 

@@ -40,6 +40,10 @@ export interface AppSettings {
     "koreaderSyncDir": string;
     "featureDiscover": boolean;
     "featureSmartShelves": boolean;
+    "watchFolderEnabled": boolean;
+    "watchFolderDir": string;
+    "watchFolderDelaySeconds": number;
+    "watchFolderDeleteSource": boolean;
 }
 
 /**
@@ -538,4 +542,13 @@ export interface SmartShelfSummary {
     "id": number;
     "name": string;
     "count": number;
+}
+
+export interface WatchFolderStatus {
+    "enabled": boolean;
+    "running": boolean;
+    "dir": string;
+    "delaySeconds": number;
+    "deleteSource": boolean;
+    "lastError"?: string;
 }
