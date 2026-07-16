@@ -120,6 +120,7 @@ export const fr = {
   "book.progressRead": "{pct} % lu",
   "book.read": "Lu",
   "book.onReaderChip": "Sur la liseuse",
+  "book.ratingChip": "Note : {rating}/5",
   "book.noteTitle": "{count} surlignage(s) / note(s)",
 
   "view.filter.all": "Tous",
@@ -218,6 +219,7 @@ export const fr = {
   "dashboard.content.chars": "caractères",
   "dashboard.content.coverage": "Couverture de l’index plein texte",
   "dashboard.reading.title": "Lecture",
+  "dashboard.ratings.title": "Notes attribuées",
   "dashboard.reading.distribution": "Répartition par statut de lecture",
   "dashboard.reading.unread": "Non lus",
   "dashboard.noBook": "Aucun livre.",

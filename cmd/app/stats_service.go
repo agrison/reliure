@@ -36,6 +36,14 @@ type ReadingBreakdown struct {
 	Unread    int `json:"unread"`
 }
 
+// RatingGroup counts the books that carry a given star rating and lists them
+// (for the dashboard's expandable rating breakdown).
+type RatingGroup struct {
+	Rating int        `json:"rating"` // 1..5
+	Count  int        `json:"count"`
+	Books  []BookCard `json:"books"`
+}
+
 // Dashboard is the full analytics payload.
 type Dashboard struct {
 	Books        int              `json:"books"`
@@ -47,6 +55,7 @@ type Dashboard struct {
 	OnDevice     int              `json:"onDevice"`
 	Annotations  int              `json:"annotations"`
 	Reading      ReadingBreakdown `json:"reading"`
+	Ratings      []RatingGroup    `json:"ratings"`
 	Formats      []NameCount      `json:"formats"`
 	Languages    []NameCount      `json:"languages"`
 	TopAuthors   []NameCount      `json:"topAuthors"`
@@ -149,6 +158,16 @@ func (s *StatsService) Dashboard() (Dashboard, error) {
 		return d, err
 	}
 
+	ratings, err := s.db.Reading.Ratings()
+	if err != nil {
+		return d, err
+	}
+	rated, err := s.db.Books.ListRated()
+	if err != nil {
+		return d, err
+	}
+	d.Ratings = ratingGroups(rated, ratings)
+
 	if s.inventory != nil {
 		if ids, err := s.inventory.AllBookIDs(); err == nil {
 			d.OnDevice = len(ids)
@@ -180,6 +199,22 @@ func (s *StatsService) loadReadingStats() *koreaderstats.ReadingStats {
 		return nil
 	}
 	return &rs
+}
+
+// ratingGroups buckets the rated books into 5★…1★ rows (always all five, even
+// when empty), preserving each book's rating→title order from ListRated.
+func ratingGroups(rated []*core.Book, ratings map[int64]int) []RatingGroup {
+	byRating := make(map[int][]BookCard, 5)
+	for _, c := range cards(rated) {
+		if r := ratings[c.ID]; r >= 1 && r <= 5 {
+			byRating[r] = append(byRating[r], c)
+		}
+	}
+	out := make([]RatingGroup, 0, 5)
+	for r := 5; r >= 1; r-- {
+		out = append(out, RatingGroup{Rating: r, Count: len(byRating[r]), Books: byRating[r]})
+	}
+	return out
 }
 
 // topNamed sorts entities by descending count (name breaks ties) and keeps n.

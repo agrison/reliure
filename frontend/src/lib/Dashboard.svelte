@@ -9,13 +9,22 @@
   let {
     onOpenBook,
     onSelectStatus,
+    refreshKey = 0,
   }: {
     onOpenBook: (id: number) => void;
     onSelectStatus: (status: ReadingStatus) => void;
+    // Bumped by the parent when reading data changes (rating/status set from the
+    // book overlay while the dashboard stays mounted underneath), forcing a reload.
+    refreshKey?: number;
   } = $props();
 
   let loading = $state(true);
   let d = $state<Dashboard | null>(null);
+
+  // Rating breakdown: which star row is expanded to reveal its books.
+  let expandedRating = $state<number | null>(null);
+  let ratingMax = $derived(Math.max(1, ...(d?.ratings ?? []).map((g) => g.count)));
+  let hasRatings = $derived((d?.ratings ?? []).some((g) => g.count > 0));
 
   async function load() {
     loading = true;
@@ -208,7 +217,12 @@
   const hourMax = $derived(maxSeconds(d?.readingStats?.byHour));
   const topBookMax = $derived(maxSeconds((d?.readingStats?.topBooks ?? []).map((b) => b.seconds)));
 
-  load();
+  // Initial load, and reload whenever the parent bumps refreshKey (a rating or
+  // reading status was changed elsewhere while the dashboard stayed mounted).
+  $effect(() => {
+    refreshKey;
+    load();
+  });
 
   // Auto-refresh when reading stats are (re)fetched (e.g. on device connect).
   onMount(() => Events.On("reading:statsUpdated", () => load()));
@@ -278,6 +292,46 @@
           <p class="empty">{t("dashboard.noBook")}</p>
         {/if}
       </section>
+
+      <!-- Rating breakdown: one row per star value; expand a row to see the
+           books that carry that rating. -->
+      {#if hasRatings}
+        <section class="card wide">
+          <h3>{t("dashboard.ratings.title")}</h3>
+          <div class="ratings">
+            {#each d.ratings ?? [] as g (g.rating)}
+              <div class="ratingrow">
+                <button
+                  class="rbar"
+                  class:on={expandedRating === g.rating}
+                  disabled={!g.count}
+                  aria-expanded={expandedRating === g.rating}
+                  onclick={() => (expandedRating = expandedRating === g.rating ? null : g.rating)}
+                >
+                  <span class="rstars" aria-label={t("book.ratingChip", undefined, { rating: g.rating })}>
+                    <span class="on">{"★".repeat(g.rating)}</span><span class="off">{"★".repeat(5 - g.rating)}</span>
+                  </span>
+                  <span class="rtrack"><span class="rfill" style="width:{pct(g.count, ratingMax)}%"></span></span>
+                  <span class="rcount">{fr(g.count)}</span>
+                  <span class="rchev" class:open={expandedRating === g.rating}>{g.count ? "▸" : ""}</span>
+                </button>
+                {#if expandedRating === g.rating && g.count}
+                  <div class="rrow">
+                    {#each g.books ?? [] as b (b.id)}
+                      <button class="rbook" onclick={() => onOpenBook(b.id)} title={b.title}>
+                        <div class="rcover">
+                          {#if b.cover}<img src={b.cover} alt="" loading="lazy" />{:else}<span class="rph">{b.title.slice(0, 1)}</span>{/if}
+                        </div>
+                        <span class="rtitle ellipsis">{b.title}</span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
 
       <section class="card">
         <h3>{t("dashboard.formats")}</h3>
@@ -891,6 +945,83 @@
     font-size: 0.8rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Rating breakdown rows (gold), each expandable to its books. */
+  .ratings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .ratingrow {
+    display: flex;
+    flex-direction: column;
+  }
+  .rbar {
+    display: grid;
+    grid-template-columns: 88px 1fr auto 0.9rem;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.34rem 0.45rem;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .rbar:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+  .rbar:not(:disabled):hover {
+    background: var(--inset);
+  }
+  .rbar.on {
+    background: color-mix(in srgb, #f5b301 12%, transparent);
+  }
+  .rstars {
+    font-size: 0.86rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .rstars .on {
+    color: #f5b301;
+  }
+  .rstars .off {
+    color: var(--border-hi);
+  }
+  .rtrack {
+    height: 9px;
+    background: var(--inset);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .rfill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #e0a119, #f5c542);
+    border-radius: 999px;
+    min-width: 3px;
+  }
+  .rcount {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .rchev {
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-align: center;
+    transition: transform 0.15s ease;
+  }
+  .rchev.open {
+    transform: rotate(90deg);
+  }
+  .ratingrow .rrow {
+    padding: 0.55rem 0.45rem 0.7rem;
   }
 
   /* Reading status bar. */

@@ -90,6 +90,9 @@
               {deviceLabel(deviceStates[b.id])}
             </span>
           {/if}
+          {#if readingStates[b.id]?.rating}
+            <span class="rating" title={t("book.ratingChip", undefined, { rating: readingStates[b.id].rating })}>★ {readingStates[b.id].rating}</span>
+          {/if}
           {#if readingStates[b.id]?.annotations}
             <span class="notes" title={t("book.noteTitle", undefined, { count: readingStates[b.id].annotations })}>✎ {readingStates[b.id].annotations}</span>
           {/if}
@@ -139,6 +142,11 @@
              which ones a book has (series / read / on-reader). -->
         <div class="col series ellipsis">
           {#if b.series}{b.series}{b.seriesIndex ? ` #${b.seriesIndex}` : ""}{/if}
+        </div>
+        <div class="col right">
+          {#if readingStates[b.id]?.rating}
+            <span class="chip rating" title={t("book.ratingChip", undefined, { rating: readingStates[b.id].rating })}>★ {readingStates[b.id].rating}</span>
+          {/if}
         </div>
         <div class="col right">
           {#if readingStates[b.id]?.status === "complete"}
@@ -258,8 +266,8 @@
   }
   .notes {
     position: absolute;
-    top: 0.45rem;
-    right: 0.45rem;
+    left: 0.45rem;
+    bottom: 0.45rem;
     padding: 0.14rem 0.4rem;
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.62);
@@ -268,6 +276,23 @@
     font-size: 0.64rem;
     font-weight: 650;
     pointer-events: none;
+  }
+  /* Star rating badge, gold, top-right (mirrors the device chip bottom-right). */
+  .rating {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    padding: 0.16rem 0.44rem;
+    border-radius: 999px;
+    background: linear-gradient(145deg, #f5c542, #e0a119);
+    color: #3d2a03;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
   }
   .progress {
     position: absolute;
@@ -344,11 +369,11 @@
     cursor: pointer;
     text-align: left;
     display: grid;
-    /* thumb | title+author | series | read | on-reader | formats.
+    /* thumb | title+author | series | rating | read | on-reader | formats.
        Title and series share the slack (title keeps priority) so the series +
        volume gets more room on a wide window; the badge columns stay fixed so
        they line up across rows whether or not a given book fills them. */
-    grid-template-columns: 40px minmax(0, 1.7fr) minmax(0, 1fr) 58px 118px 96px;
+    grid-template-columns: 40px minmax(0, 1.7fr) minmax(0, 1fr) 46px 58px 118px 96px;
     align-items: center;
     gap: 0.7rem;
     padding: 0.55rem 0.6rem;
@@ -432,6 +457,12 @@
   .chip.pct {
     color: var(--muted);
     background: var(--surface-hi);
+    font-variant-numeric: tabular-nums;
+  }
+  .chip.rating {
+    color: #d69a12;
+    border-color: color-mix(in srgb, #f5b301 45%, var(--border));
+    background: color-mix(in srgb, #f5b301 15%, transparent);
     font-variant-numeric: tabular-nums;
   }
 

@@ -27,6 +27,7 @@ type ReadingCard struct {
 	Percent     float64 `json:"percent"`
 	Pages       int     `json:"pages"`
 	Status      string  `json:"status"`
+	Rating      int     `json:"rating"` // 1..5 star rating (0 = unrated)
 	Annotations int     `json:"annotations"`
 }
 
@@ -95,7 +96,7 @@ func (s *KOReaderService) ReadingStates() ([]ReadingCard, error) {
 	}
 	out := make([]ReadingCard, 0, len(states))
 	for id, st := range states {
-		out = append(out, ReadingCard{BookID: id, Percent: st.Percent, Pages: st.Pages, Status: st.Status, Annotations: counts[id]})
+		out = append(out, ReadingCard{BookID: id, Percent: st.Percent, Pages: st.Pages, Status: st.Status, Rating: st.Rating, Annotations: counts[id]})
 	}
 	// Books with annotations but no progress row still deserve a badge.
 	for id, n := range counts {

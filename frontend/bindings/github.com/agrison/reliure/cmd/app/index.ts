@@ -58,6 +58,7 @@ export type {
     QuickEditRowError,
     QuickEditSaveResult,
     QuickEditSavedBook,
+    RatingGroup,
     ReadingBreakdown,
     ReadingCard,
     ReadingStatsFetch,

@@ -247,6 +247,26 @@ func (r *ReadingRepo) StatusCounts() (map[string]int, error) {
 	return out, rows.Err()
 }
 
+// Ratings returns each rated book's star rating (1..5), keyed by book id. Books
+// without a rating are omitted.
+func (r *ReadingRepo) Ratings() (map[int64]int, error) {
+	rows, err := r.db.Query(`SELECT book_id, rating FROM reading_state WHERE rating > 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int64]int)
+	for rows.Next() {
+		var id int64
+		var rating int
+		if err := rows.Scan(&id, &rating); err != nil {
+			return nil, err
+		}
+		out[id] = rating
+	}
+	return out, rows.Err()
+}
+
 func scanState(s interface{ Scan(...any) error }) (ReadingState, error) {
 	var (
 		st           ReadingState

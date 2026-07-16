@@ -259,6 +259,7 @@ export interface Dashboard {
     "onDevice": number;
     "annotations": number;
     "reading": ReadingBreakdown;
+    "ratings": RatingGroup[] | null;
     "formats": NameCount[] | null;
     "languages": NameCount[] | null;
     "topAuthors": NameCount[] | null;
@@ -503,6 +504,19 @@ export interface QuickEditSavedBook {
 }
 
 /**
+ * RatingGroup counts the books that carry a given star rating and lists them
+ * (for the dashboard's expandable rating breakdown).
+ */
+export interface RatingGroup {
+    /**
+     * 1..5
+     */
+    "rating": number;
+    "count": number;
+    "books": BookCard[] | null;
+}
+
+/**
  * ReadingBreakdown splits the library by reading status (unread = everything
  * not tracked or explicitly new).
  */
@@ -521,6 +535,11 @@ export interface ReadingCard {
     "percent": number;
     "pages": number;
     "status": string;
+
+    /**
+     * 1..5 star rating (0 = unrated)
+     */
+    "rating": number;
     "annotations": number;
 }
 

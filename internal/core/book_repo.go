@@ -333,6 +333,21 @@ func (r *BookRepo) ListByReadingStatus(status string) ([]*Book, error) {
 	return books, r.hydrate(books)
 }
 
+// ListRated returns every book carrying a star rating (1..5), best-rated first
+// then by title, for the dashboard's rating breakdown.
+func (r *BookRepo) ListRated() ([]*Book, error) {
+	q := `SELECT ` + bookCols + ` FROM book b
+	      JOIN reading_state rs ON rs.book_id = b.id
+	      WHERE rs.rating > 0
+	      ORDER BY rs.rating DESC, ` +
+		`(CASE WHEN b.title_sort='' THEN b.title ELSE b.title_sort END) COLLATE NOCASE`
+	books, err := r.scanBooks(q)
+	if err != nil {
+		return nil, err
+	}
+	return books, r.hydrate(books)
+}
+
 // ListWithoutTags returns books that carry no tag.
 func (r *BookRepo) ListWithoutTags() ([]*Book, error) {
 	q := `SELECT ` + bookCols + ` FROM book b

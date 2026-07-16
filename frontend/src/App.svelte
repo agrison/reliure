@@ -79,6 +79,9 @@
   let deviceStates = $state<Record<number, DeviceBookState>>({});
   let deviceFilter = $state<"all" | "present" | "absent">("all");
   let readingStates = $state<Record<number, ReadingCard>>({});
+  // Bumped whenever reading data (rating/status) changes so the dashboard, which
+  // stays mounted under the book overlay, reloads instead of showing stale stats.
+  let dashboardVersion = $state(0);
   let readingCounts = $state<ReadingStatusCounts | null>(null);
   let annotationTotal = $state(0);
   let syncingKoreader = $state(false);
@@ -472,6 +475,7 @@
     try {
       detail = await LibraryService.SetReadingState(update);
       await Promise.all([loadSidebar(), loadReadingStates(), loadBooks()]);
+      dashboardVersion++;
     } catch (e) {
       toast = `Enregistrement impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -482,6 +486,8 @@
     if (!detail) return;
     try {
       detail = await LibraryService.SetReadingRating(detail.id, rating);
+      await loadReadingStates();
+      dashboardVersion++;
     } catch (e) {
       toast = `Enregistrement impossible · ${errorMessage(e)}`;
       setTimeout(() => (toast = ""), 6000);
@@ -945,7 +951,7 @@
           <p class="state">{msg("common.loading")}</p>
         {/if}
       {:else if view.kind === "dashboard"}
-        <Dashboard onOpenBook={openBook} onSelectStatus={(status) => selectView({ kind: "reading", status })} />
+        <Dashboard onOpenBook={openBook} onSelectStatus={(status) => selectView({ kind: "reading", status })} refreshKey={dashboardVersion} />
       {:else if view.kind === "contentOccurrences"}
         <ContentOccurrences
           query={view.query}
