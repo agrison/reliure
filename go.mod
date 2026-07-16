@@ -6,6 +6,7 @@ require (
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
 	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/image v0.44.0
+	golang.org/x/text v0.40.0
 	modernc.org/sqlite v1.53.0
 )
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/formats"
 	"github.com/agrison/reliure/internal/library"
+	"golang.org/x/text/collate"
+	"golang.org/x/text/language"
 )
 
 // coverURLPrefix is where the custom asset handler serves cached thumbnails.
@@ -874,7 +877,19 @@ func sidebar(items []core.NamedCount, err error) ([]SidebarItem, error) {
 	for _, it := range items {
 		out = append(out, SidebarItem{ID: it.ID, Name: it.Name, Count: it.Count})
 	}
+	sortByName(out)
 	return out, nil
+}
+
+// sortByName orders sidebar entries alphabetically by their displayed name,
+// case- and accent-insensitively (collate.Loose) so the list reads A→Z by what
+// the user actually sees, across the app's languages. A fresh collator per call
+// keeps this goroutine-safe (collate.Collator is not).
+func sortByName(items []SidebarItem) {
+	c := collate.New(language.French, collate.Loose)
+	sort.SliceStable(items, func(i, j int) bool {
+		return c.CompareString(items[i].Name, items[j].Name) < 0
+	})
 }
 
 func appendMissingGroup(items []SidebarItem, label string, count int, err error) ([]SidebarItem, error) {
