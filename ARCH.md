@@ -143,10 +143,13 @@ flowchart LR
   Calibre sends, Reliure updates a versioned JSON document with local book/file
   ids, remote path, format, size, SHA-256, sent date and display metadata. The
   manifest is cached locally under the config directory and sent to the device
-  as `.reliure`. On reconnect, the UI uses the cached inventory for the
-  connected device to mark books as present/absent; direct remote reads of
-  `.reliure` are intentionally left isolated for a later protocol extension if
-  KOReader exposes a reliable file-read path.
+  as `.reliure`. The UI marks books present/absent from this inventory; because
+  it persists on disk keyed by device name, `CalibreService.BookStates` falls
+  back to the **last connected device** (`settings.LastDeviceName`) when no
+  reader is currently connected, so presence stays visible offline and refreshes
+  on the next connection. This also powers the library's on-device filter
+  (all / on-reader / not-on-reader). Direct remote reads of `.reliure` are
+  intentionally left isolated for a later protocol extension.
 
 - **Smart shelves** — persisted in `smart_shelf` as rule JSON, not as
   materialised book lists. `LibraryService` evaluates them against hydrated

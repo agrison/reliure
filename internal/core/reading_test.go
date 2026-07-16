@@ -66,6 +66,52 @@ func TestStatusCountsAndListByStatus(t *testing.T) {
 	}
 }
 
+func TestRatingMergePolicy(t *testing.T) {
+	db := newTestDB(t)
+	id := readingTestBook(t, db)
+
+	// No manual rating → the device rating is mirrored in.
+	if err := db.Reading.MergeDeviceState(ReadingState{BookID: id, Status: "reading", Percent: 0.2, Rating: 4}); err != nil {
+		t.Fatal(err)
+	}
+	st, _, _ := db.Reading.State(id)
+	if st.Rating != 4 || st.RatingManual {
+		t.Fatalf("after device sync: rating=%d manual=%v, want 4/false", st.Rating, st.RatingManual)
+	}
+
+	// The user rates it 5 by hand → protected.
+	if err := db.Reading.SetRating(id, 5); err != nil {
+		t.Fatal(err)
+	}
+	if st, _, _ = db.Reading.State(id); st.Rating != 5 || !st.RatingManual {
+		t.Fatalf("after manual rating: rating=%d manual=%v, want 5/true", st.Rating, st.RatingManual)
+	}
+
+	// A later device sync must NOT overwrite the manual rating (even a lower one),
+	// while progress still advances.
+	if err := db.Reading.MergeDeviceState(ReadingState{BookID: id, Status: "reading", Percent: 0.6, Rating: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if st, _, _ = db.Reading.State(id); st.Rating != 5 {
+		t.Errorf("manual rating overwritten: rating=%d, want 5", st.Rating)
+	}
+	if st.Percent != 0.6 {
+		t.Errorf("progress did not advance alongside protected rating: %v", st.Percent)
+	}
+
+	// Clearing the manual rating (0) reverts to device-driven: the next sync fills.
+	if err := db.Reading.SetRating(id, 0); err != nil {
+		t.Fatal(err)
+	}
+	if st, _, _ = db.Reading.State(id); st.Rating != 0 || st.RatingManual {
+		t.Fatalf("after clear: rating=%d manual=%v, want 0/false", st.Rating, st.RatingManual)
+	}
+	_ = db.Reading.MergeDeviceState(ReadingState{BookID: id, Status: "reading", Percent: 0.6, Rating: 3})
+	if st, _, _ = db.Reading.State(id); st.Rating != 3 {
+		t.Errorf("after re-enabling device rating: rating=%d, want 3", st.Rating)
+	}
+}
+
 func TestMergeDeviceStateOneDirectional(t *testing.T) {
 	db := newTestDB(t)
 	id := readingTestBook(t, db)

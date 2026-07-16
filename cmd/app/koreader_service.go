@@ -182,6 +182,7 @@ func (s *KOReaderService) sync(dir string) (KoreaderSyncResult, error) {
 		pages    int
 		status   string
 		modified string
+		rating   int
 		anns     []core.Annotation
 	}
 	byBook := map[int64]*agg{}
@@ -206,6 +207,9 @@ func (s *KOReaderService) sync(dir string) (KoreaderSyncResult, error) {
 		if sc.ModifiedAt > a.modified {
 			a.modified = sc.ModifiedAt
 		}
+		if sc.Rating > 0 {
+			a.rating = sc.Rating
+		}
 		for _, an := range sc.Annotations {
 			a.anns = append(a.anns, core.Annotation{
 				BookID: bookID, Text: an.Text, Note: an.Note,
@@ -217,7 +221,7 @@ func (s *KOReaderService) sync(dir string) (KoreaderSyncResult, error) {
 
 	for bookID, a := range byBook {
 		if err := s.db.Reading.MergeDeviceState(core.ReadingState{
-			BookID: bookID, Percent: a.percent, Pages: a.pages, Status: a.status, LastReadAt: a.modified,
+			BookID: bookID, Percent: a.percent, Pages: a.pages, Status: a.status, LastReadAt: a.modified, Rating: a.rating,
 		}); err != nil {
 			return res, err
 		}

@@ -291,6 +291,15 @@ export function SetAuthorSort(bookID: number, authorID: number, sort: string): $
 }
 
 /**
+ * SetReadingRating stores a star rating (1..5; 0 clears it) set by hand. A manual
+ * rating is protected from KOReader sync (which only fills in an unrated book);
+ * see ReadingRepo.SetRating.
+ */
+export function SetReadingRating(bookID: number, rating: number): $CancellablePromise<$models.BookDetail> {
+    return $Call.ByID(3092428619, bookID, rating);
+}
+
+/**
  * SetReadingState records a book's reading progress/status set by hand, so the
  * feature works without ever connecting KOReader. It always wins over the stored
  * value (unlike device sync, which only advances); a later KOReader sync will

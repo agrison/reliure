@@ -1,20 +1,24 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/device"
+	"github.com/agrison/reliure/internal/koreaderstats"
 	"github.com/agrison/reliure/internal/settings"
 )
 
 // StatsService computes the analytics dashboard. It is read-only and assembles
 // its answer from a handful of aggregate queries plus the device inventory.
 type StatsService struct {
-	db        *core.DB
-	inventory *device.Store
-	settings  *settings.Store
+	db               *core.DB
+	inventory        *device.Store
+	settings         *settings.Store
+	readingStatsPath string // cached KOReader reading stats (JSON), if fetched
 }
 
 // NameCount is a labelled magnitude for the dashboard's bar charts.
@@ -50,6 +54,9 @@ type Dashboard struct {
 	AddedByMonth []NameCount      `json:"addedByMonth"`
 	Recent       []BookCard       `json:"recent"`
 	Content      ContentDashboard `json:"content"`
+	// ReadingStats holds KOReader reading-time aggregates when the feature is on
+	// and stats have been fetched; nil otherwise.
+	ReadingStats *koreaderstats.ReadingStats `json:"readingStats"`
 }
 
 type ContentDashboard struct {
@@ -153,8 +160,26 @@ func (s *StatsService) Dashboard() (Dashboard, error) {
 		return d, err
 	}
 	d.Recent = cards(recent)
+	d.ReadingStats = s.loadReadingStats()
 
 	return d, nil
+}
+
+// loadReadingStats returns the cached KOReader reading stats when the feature is
+// enabled and a fetch has happened; nil otherwise (section hidden).
+func (s *StatsService) loadReadingStats() *koreaderstats.ReadingStats {
+	if s.readingStatsPath == "" || !s.settings.Get().ReadingStatsEnabled {
+		return nil
+	}
+	data, err := os.ReadFile(s.readingStatsPath)
+	if err != nil {
+		return nil
+	}
+	var rs koreaderstats.ReadingStats
+	if json.Unmarshal(data, &rs) != nil {
+		return nil
+	}
+	return &rs
 }
 
 // topNamed sorts entities by descending count (name breaks ties) and keeps n.

@@ -72,6 +72,8 @@ type BookDetail struct {
 	Pages         int          `json:"pages"`
 	ReadingStatus string       `json:"readingStatus"`
 	LastReadAt    string       `json:"lastReadAt"`
+	Rating        int          `json:"rating"`       // 1..5 star rating (0 = unrated)
+	RatingManual  bool         `json:"ratingManual"` // true if set by hand in Reliure
 	Annotations   []Annotation `json:"annotations"`
 }
 
@@ -446,6 +448,8 @@ func (s *LibraryService) Book(id int64) (BookDetail, error) {
 		d.Pages = st.Pages
 		d.ReadingStatus = st.Status
 		d.LastReadAt = st.LastReadAt
+		d.Rating = st.Rating
+		d.RatingManual = st.RatingManual
 	}
 	if anns, err := s.db.Reading.Annotations(b.ID); err == nil {
 		for _, a := range anns {
@@ -604,10 +608,23 @@ func (s *LibraryService) SetReadingState(in ReadingUpdate) (BookDetail, error) {
 		Pages:      pages,
 		Status:     status,
 		LastReadAt: time.Now().UTC().Format("2006-01-02"),
+		// Preserve the rating: it is edited separately (SetReadingRating).
+		Rating:       existing.Rating,
+		RatingManual: existing.RatingManual,
 	}); err != nil {
 		return BookDetail{}, err
 	}
 	return s.Book(in.BookID)
+}
+
+// SetReadingRating stores a star rating (1..5; 0 clears it) set by hand. A manual
+// rating is protected from KOReader sync (which only fills in an unrated book);
+// see ReadingRepo.SetRating.
+func (s *LibraryService) SetReadingRating(bookID int64, rating int) (BookDetail, error) {
+	if err := s.db.Reading.SetRating(bookID, rating); err != nil {
+		return BookDetail{}, err
+	}
+	return s.Book(bookID)
 }
 
 func clampUnit(v float64) float64 {

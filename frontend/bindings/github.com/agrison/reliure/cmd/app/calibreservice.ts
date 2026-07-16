@@ -16,10 +16,32 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
- * BookStates returns per-book presence information for the connected device.
+ * BookStates returns per-book presence information for the connected device, or
+ * — when disconnected — for the last device seen, so the UI keeps showing which
+ * books are on the reader from cache. Statuses refresh on the next connection.
  */
 export function BookStates(ids: number[] | null): $CancellablePromise<$models.DeviceBookState[] | null> {
     return $Call.ByID(1092196108, ids);
+}
+
+/**
+ * FetchReadingStats fetches KOReader's statistics database over the live
+ * connection (dynamic path search), computes the reading aggregates and caches
+ * them so the dashboard can show them offline. Refreshed each time it runs.
+ */
+export function FetchReadingStats(): $CancellablePromise<$models.ReadingStatsFetch> {
+    return $Call.ByID(4234463762);
+}
+
+/**
+ * ProbeReadingStats tries to fetch KOReader's `statistics.sqlite3` over the live
+ * connection. It lives under `koreader/settings/`, OUTSIDE the Calibre inbox, so
+ * we probe a handful of relative paths (KOReader's GET_BOOK_FILE_SEGMENT resolves
+ * them under the inbox with no sanitising, so `..` traversal may reach it). This
+ * confirms feasibility on real hardware before we build the full stats feature.
+ */
+export function ProbeReadingStats(): $CancellablePromise<$models.ReadingStatsProbe> {
+    return $Call.ByID(3311387856);
 }
 
 /**

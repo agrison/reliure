@@ -60,6 +60,8 @@ export type {
     QuickEditSavedBook,
     ReadingBreakdown,
     ReadingCard,
+    ReadingStatsFetch,
+    ReadingStatsProbe,
     ReadingStatusCounts,
     ReadingUpdate,
     RemoveBookResult,

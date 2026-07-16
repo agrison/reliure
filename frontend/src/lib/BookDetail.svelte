@@ -11,6 +11,7 @@
     onSetAuthorSort,
     onFetchOnline,
     onSetReading,
+    onSetRating,
   }: {
     book: BookDetail;
     onClose: () => void;
@@ -20,7 +21,16 @@
     onSetAuthorSort: (authorId: number, sort: string) => Promise<void> | void;
     onFetchOnline: () => void;
     onSetReading: (update: ReadingUpdate) => Promise<void> | void;
+    onSetRating: (rating: number) => Promise<void> | void;
   } = $props();
+
+  // Star rating: click a star to set it (manual, protected from device sync),
+  // click the current one to clear. Hover previews the value.
+  let hoverStar = $state(0);
+  function setRating(n: number) {
+    hoverStar = 0;
+    onSetRating(n);
+  }
 
   // Manual reading tracking (works with or without KOReader). Inputs are seeded
   // from the book and only re-seed when the book changes (after a save), so
@@ -358,6 +368,25 @@
         <button class:on={book.readingStatus === "reading"} onclick={() => setReadingStatus("reading")}>{t("nav.reading")}</button>
         <button class:on={book.readingStatus === "complete"} onclick={() => setReadingStatus("complete")}>{t("detail.complete")}</button>
         <button class:on={book.readingStatus === "abandoned"} onclick={() => setReadingStatus("abandoned")}>{t("detail.abandoned")}</button>
+      </div>
+
+      <div class="ratingrow">
+        <span class="ratinglabel">{t("detail.rating")}</span>
+        <div class="stars" role="radiogroup" aria-label={t("detail.rating")}>
+          {#each [1, 2, 3, 4, 5] as n}
+            <button
+              class="star"
+              class:on={(hoverStar || book.rating) >= n}
+              onmouseenter={() => (hoverStar = n)}
+              onmouseleave={() => (hoverStar = 0)}
+              onclick={() => setRating(n === book.rating ? 0 : n)}
+              aria-label={t("detail.rateStars", undefined, { n })}
+            >★</button>
+          {/each}
+        </div>
+        {#if book.rating > 0}
+          <button class="ratingclear" onclick={() => setRating(0)} title={t("detail.clear")} aria-label={t("detail.clear")}>×</button>
+        {/if}
       </div>
 
       {#if book.readingStatus || book.percent > 0}
@@ -841,6 +870,49 @@
     flex-wrap: wrap;
     gap: 0.35rem;
     margin-bottom: 0.7rem;
+  }
+  .ratingrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+  }
+  .ratinglabel {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .stars {
+    display: inline-flex;
+    gap: 0.1rem;
+  }
+  .star {
+    border: none;
+    background: none;
+    padding: 0 0.05rem;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--border-hi);
+    transition: color 0.1s;
+  }
+  .star.on {
+    color: #f5b301;
+  }
+  .ratingclear {
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 50%;
+    background: var(--surface-hi);
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .ratingclear:hover {
+    color: var(--text);
   }
   .statuschips button {
     padding: 0.32rem 0.6rem;

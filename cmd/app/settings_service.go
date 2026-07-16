@@ -33,6 +33,7 @@ type AppSettings struct {
 	WatchFolderDelete    bool   `json:"watchFolderDeleteSource"`
 	ContentSearchEnabled bool   `json:"contentSearchEnabled"`
 	ContentSearchContext string `json:"contentSearchContext"`
+	ReadingStatsEnabled  bool   `json:"readingStatsEnabled"`
 }
 
 func toAppSettings(s settings.Settings) AppSettings {
@@ -54,6 +55,7 @@ func toAppSettings(s settings.Settings) AppSettings {
 		WatchFolderDelete:    s.WatchFolderDeleteSource,
 		ContentSearchEnabled: s.ContentSearchEnabled,
 		ContentSearchContext: s.ContentSearchContext,
+		ReadingStatsEnabled:  s.ReadingStatsEnabled,
 	}
 }
 
@@ -147,6 +149,14 @@ func (s *SettingsService) SetContentSearchEnabled(enabled bool) (AppSettings, er
 	if err == nil && enabled && s.library != nil {
 		go s.library.reindexContentQuietly()
 	}
+	return toAppSettings(next), err
+}
+
+// SetReadingStatsEnabled toggles fetching KOReader's reading-statistics database.
+func (s *SettingsService) SetReadingStatsEnabled(enabled bool) (AppSettings, error) {
+	cur := s.store.Get()
+	cur.ReadingStatsEnabled = enabled
+	next, err := s.store.Update(cur)
 	return toAppSettings(next), err
 }
 

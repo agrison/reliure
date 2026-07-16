@@ -135,26 +135,24 @@
           <div class="t ellipsis">{b.title}</div>
           <div class="a ellipsis">{b.authors || t("common.none")}</div>
         </div>
-        {#if b.series}
-          <div class="series ellipsis">
-            {b.series}{b.seriesIndex ? ` #${b.seriesIndex}` : ""}
-          </div>
-        {/if}
-        {#if deviceLabel(deviceStates[b.id])}
-          <div
-            class="device listbadge"
-            class:present={deviceStates[b.id]?.status === "present"}
-            title={deviceStates[b.id]?.remotePath || deviceLabel(deviceStates[b.id])}
-          >
-            {deviceLabel(deviceStates[b.id])}
-          </div>
-        {/if}
-        {#if progress(readingStates[b.id]) > 0}
-          <span class="readpct" class:done={readingStates[b.id]?.status === "complete"}>
-            {readingStates[b.id]?.status === "complete" ? t("book.read") : Math.round(progress(readingStates[b.id]) * 100) + " %"}
-          </span>
-        {/if}
-        <div class="formats">
+        <!-- Fixed slots so badges stay column-aligned across rows regardless of
+             which ones a book has (series / read / on-reader). -->
+        <div class="col series ellipsis">
+          {#if b.series}{b.series}{b.seriesIndex ? ` #${b.seriesIndex}` : ""}{/if}
+        </div>
+        <div class="col right">
+          {#if readingStates[b.id]?.status === "complete"}
+            <span class="chip read">{t("book.read")}</span>
+          {:else if progress(readingStates[b.id]) > 0}
+            <span class="chip pct" title={progressTitle(readingStates[b.id])}>{Math.round(progress(readingStates[b.id]) * 100)} %</span>
+          {/if}
+        </div>
+        <div class="col right">
+          {#if deviceStates[b.id]?.status === "present"}
+            <span class="chip reader" title={deviceStates[b.id]?.remotePath || t("book.onReaderChip")}>{t("book.onReaderChip")}</span>
+          {/if}
+        </div>
+        <div class="col formats">
           {#each b.formats as f}<span class="tag">{f}</span>{/each}
         </div>
         </button>
@@ -287,17 +285,6 @@
   .pfill.done {
     background: var(--ok);
   }
-  .readpct {
-    justify-self: end;
-    font-size: 0.72rem;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-  .readpct.done {
-    color: var(--ok);
-    font-weight: 650;
-  }
   .ph {
     width: 100%;
     height: 100%;
@@ -357,11 +344,22 @@
     cursor: pointer;
     text-align: left;
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr) auto auto auto;
+    /* thumb | title+author | series | read | on-reader | formats.
+       Title and series share the slack (title keeps priority) so the series +
+       volume gets more room on a wide window; the badge columns stay fixed so
+       they line up across rows whether or not a given book fills them. */
+    grid-template-columns: 40px minmax(0, 1.7fr) minmax(0, 1fr) 58px 118px 96px;
     align-items: center;
-    gap: 1rem;
+    gap: 0.7rem;
     padding: 0.55rem 0.6rem;
     min-width: 0;
+  }
+  .col {
+    min-width: 0;
+  }
+  .col.right {
+    display: flex;
+    justify-content: flex-end;
   }
   .rowopen:hover {
     background: var(--surface);
@@ -392,16 +390,11 @@
   .series {
     color: var(--muted);
     font-size: 0.8rem;
-    max-width: 200px;
-  }
-  .listbadge {
-    position: static;
-    justify-self: end;
-    max-width: 110px;
   }
   .formats {
     display: flex;
     gap: 0.3rem;
+    justify-content: flex-end;
   }
   .tag {
     font-size: 0.64rem;
@@ -412,6 +405,34 @@
     border: 1px solid var(--border);
     border-radius: 5px;
     padding: 0.12rem 0.35rem;
+  }
+  /* Coloured status chips, EPUB-tag style: green "Lu", blue "Sur la liseuse". */
+  .chip {
+    font-size: 0.62rem;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    border-radius: 5px;
+    padding: 0.12rem 0.4rem;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .chip.read {
+    color: var(--ok);
+    border-color: color-mix(in srgb, var(--ok) 42%, var(--border));
+    background: color-mix(in srgb, var(--ok) 13%, transparent);
+  }
+  .chip.reader {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+  }
+  .chip.pct {
+    color: var(--muted);
+    background: var(--surface-hi);
+    font-variant-numeric: tabular-nums;
   }
 
   .ellipsis {

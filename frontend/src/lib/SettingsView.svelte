@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AppSettings, OPDSStatus, CalibreStatus } from "./api";
+  import type { AppSettings, OPDSStatus, CalibreStatus, ReadingStatsFetch } from "./api";
   import { languageOptions, t, type Locale } from "./i18n";
 
   let {
@@ -29,6 +29,8 @@
     onChooseKoreader,
     onSyncKoreader,
     onSyncKoreaderFromDevice,
+    onSetReadingStatsEnabled,
+    onFetchReadingStats,
     syncingKoreader,
   }: {
     settings: AppSettings;
@@ -57,8 +59,28 @@
     onChooseKoreader: () => Promise<void> | void;
     onSyncKoreader: () => Promise<void> | void;
     onSyncKoreaderFromDevice: () => Promise<void> | void;
+    onSetReadingStatsEnabled: (enabled: boolean) => Promise<void> | void;
+    onFetchReadingStats: () => Promise<ReadingStatsFetch>;
     syncingKoreader: boolean;
   } = $props();
+
+  let fetchingStats = $state(false);
+  let statsFetch = $state<ReadingStatsFetch | null>(null);
+  async function fetchStats() {
+    if (fetchingStats) return;
+    fetchingStats = true;
+    statsFetch = null;
+    try {
+      statsFetch = await onFetchReadingStats();
+    } finally {
+      fetchingStats = false;
+    }
+  }
+  function humanDuration(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.round((seconds % 3600) / 60);
+    return h > 0 ? `${h} h ${m.toString().padStart(2, "0")}` : `${m} min`;
+  }
 
   const themes: { value: "system" | "light" | "dark"; labelKey: Parameters<typeof t>[0] }[] = [
     { value: "system", labelKey: "settings.theme.system" },
@@ -430,6 +452,44 @@
           {/if}
         </div>
       </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>{t("settings.stats.title", settings.language)}</h3>
+            <p>{t("settings.stats.description", settings.language)}</p>
+          </div>
+        </div>
+
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={settings.readingStatsEnabled}
+            onchange={(e) => onSetReadingStatsEnabled((e.target as HTMLInputElement).checked)}
+          />
+          <span>{t("settings.stats.enable", settings.language)}</span>
+        </label>
+
+        {#if calibre?.connected && settings.readingStatsEnabled}
+          <button class="action secondary-action" onclick={fetchStats} disabled={fetchingStats}>
+            {fetchingStats ? t("settings.stats.fetching", settings.language) : t("settings.stats.fetch", settings.language)}
+          </button>
+        {:else if settings.readingStatsEnabled}
+          <button class="action secondary-action" disabled>{t("settings.stats.fetch", settings.language)}</button>
+          <p class="hint">{t("settings.koreader.noReaderHint", settings.language)}</p>
+        {/if}
+
+        {#if statsFetch}
+          {#if statsFetch.parsed}
+            <p class="hint stats-ok">{t("settings.stats.fetched", settings.language, { path: statsFetch.lpath, time: humanDuration(statsFetch.totalSeconds), days: statsFetch.daysRead })}</p>
+          {:else if statsFetch.found}
+            <p class="hint stats-ko">{statsFetch.error || t("settings.stats.notParsed", settings.language)}</p>
+          {:else}
+            <p class="hint stats-ko">{t("settings.stats.notFound", settings.language, { tried: statsFetch.tried })}</p>
+          {/if}
+        {/if}
+        <p class="hint">{t("settings.stats.hint", settings.language)}</p>
+      </article>
     </div>
   </section>
 
@@ -561,6 +621,12 @@
     color: var(--muted);
     font-size: 0.82rem;
     line-height: 1.45;
+  }
+  .hint.stats-ok {
+    color: var(--ok);
+  }
+  .hint.stats-ko {
+    color: var(--danger);
   }
   .section-head p {
     margin-top: 0.25rem;

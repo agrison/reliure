@@ -9,13 +9,15 @@ import (
 
 // ReadingState mirrors a book's KOReader progress.
 type ReadingState struct {
-	BookID     int64
-	Percent    float64 // 0..1
-	Pages      int     // total pages of the device rendering (0 = unknown)
-	Status     string  // reading|complete|abandoned|new
-	Device     string
-	LastReadAt string // KOReader summary.modified, verbatim
-	SyncedAt   time.Time
+	BookID       int64
+	Percent      float64 // 0..1
+	Pages        int     // total pages of the device rendering (0 = unknown)
+	Status       string  // reading|complete|abandoned|new
+	Device       string
+	LastReadAt   string // KOReader summary.modified, verbatim
+	Rating       int    // 1..5 star rating (0 = unrated)
+	RatingManual bool   // rating set inside Reliure → protected from device sync
+	SyncedAt     time.Time
 }
 
 // Annotation is a highlight and/or note attached to a book.
@@ -38,42 +40,75 @@ func (r *ReadingRepo) UpsertState(s ReadingState) error {
 		s.SyncedAt = time.Now().UTC()
 	}
 	_, err := r.db.Exec(`
-		INSERT INTO reading_state (book_id, percent, pages, status, device, last_read_at, synced_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO reading_state (book_id, percent, pages, status, device, last_read_at, rating, rating_manual, synced_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(book_id) DO UPDATE SET
 			percent = excluded.percent,
 			pages = excluded.pages,
 			status = excluded.status,
 			device = excluded.device,
 			last_read_at = excluded.last_read_at,
+			rating = excluded.rating,
+			rating_manual = excluded.rating_manual,
 			synced_at = excluded.synced_at`,
-		s.BookID, s.Percent, s.Pages, s.Status, s.Device, s.LastReadAt, s.SyncedAt.Format(time.RFC3339))
+		s.BookID, s.Percent, s.Pages, s.Status, s.Device, s.LastReadAt, s.Rating, boolInt(s.RatingManual), s.SyncedAt.Format(time.RFC3339))
 	return err
 }
 
-// MergeDeviceState applies a state read from a KOReader device, keeping whichever
-// is FURTHER ALONG. This makes device sync one-directional: KOReader can only
-// advance Reliure's progress, never roll back a status the user set by hand (or a
-// higher progress from another device). Annotations are handled separately and
-// always taken from the device.
+// MergeDeviceState applies a state read from a KOReader device. Device sync is
+// one-directional per field:
+//   - Progress/status: adopted only when the device is FURTHER ALONG (KOReader can
+//     advance Reliure, never roll back a status set by hand or a higher progress
+//     from another device).
+//   - Rating: a rating the user set inside Reliure is authoritative and never
+//     overwritten; otherwise the device rating is mirrored.
+//
+// Annotations are handled separately and always taken from the device.
 func (r *ReadingRepo) MergeDeviceState(s ReadingState) error {
 	existing, ok, err := r.State(s.BookID)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return r.UpsertState(s) // nothing recorded yet
+		s.RatingManual = false // came from the device, not set by hand
+		return r.UpsertState(s)
 	}
+	merged := existing
 	if effectivePercent(s) > effectivePercent(existing) {
-		return r.UpsertState(s) // the device is further along
+		merged.Percent = s.Percent
+		merged.Status = s.Status
+		merged.LastReadAt = s.LastReadAt
+		merged.Device = s.Device
 	}
-	// Reliure is at least as advanced: keep it, but learn the page count if the
-	// device knows it and we didn't.
-	if existing.Pages == 0 && s.Pages > 0 {
-		existing.Pages = s.Pages
-		return r.UpsertState(existing)
+	if merged.Pages == 0 && s.Pages > 0 {
+		merged.Pages = s.Pages // learn the page count when the device knows it
 	}
-	return nil
+	if !existing.RatingManual {
+		merged.Rating = s.Rating // mirror the device rating unless set by hand
+	}
+	return r.UpsertState(merged)
+}
+
+// SetRating records a star rating (1..5; 0 clears it) chosen inside Reliure. A
+// non-zero rating is flagged manual so a later device sync won't overwrite it;
+// clearing it (0) reverts to device-driven so KOReader's rating can fill in again.
+func (r *ReadingRepo) SetRating(bookID int64, rating int) error {
+	if rating < 0 {
+		rating = 0
+	}
+	if rating > 5 {
+		rating = 5
+	}
+	existing, ok, err := r.State(bookID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		existing = ReadingState{BookID: bookID}
+	}
+	existing.Rating = rating
+	existing.RatingManual = rating > 0
+	return r.UpsertState(existing)
 }
 
 // DeleteState removes a book's reading state (used by "mark as unread").
@@ -94,7 +129,7 @@ func effectivePercent(s ReadingState) float64 {
 // State returns a book's reading state, if any.
 func (r *ReadingRepo) State(bookID int64) (ReadingState, bool, error) {
 	row := r.db.QueryRow(`
-		SELECT book_id, percent, pages, status, device, last_read_at, synced_at
+		SELECT book_id, percent, pages, status, device, last_read_at, rating, rating_manual, synced_at
 		FROM reading_state WHERE book_id = ?`, bookID)
 	s, err := scanState(row)
 	if err == sql.ErrNoRows {
@@ -109,7 +144,7 @@ func (r *ReadingRepo) State(bookID int64) (ReadingState, bool, error) {
 // AllStates returns every reading state, keyed by book id (for grid badges).
 func (r *ReadingRepo) AllStates() (map[int64]ReadingState, error) {
 	rows, err := r.db.Query(`
-		SELECT book_id, percent, pages, status, device, last_read_at, synced_at FROM reading_state`)
+		SELECT book_id, percent, pages, status, device, last_read_at, rating, rating_manual, synced_at FROM reading_state`)
 	if err != nil {
 		return nil, err
 	}
@@ -214,12 +249,14 @@ func (r *ReadingRepo) StatusCounts() (map[string]int, error) {
 
 func scanState(s interface{ Scan(...any) error }) (ReadingState, error) {
 	var (
-		st     ReadingState
-		synced string
+		st           ReadingState
+		ratingManual int
+		synced       string
 	)
-	if err := s.Scan(&st.BookID, &st.Percent, &st.Pages, &st.Status, &st.Device, &st.LastReadAt, &synced); err != nil {
+	if err := s.Scan(&st.BookID, &st.Percent, &st.Pages, &st.Status, &st.Device, &st.LastReadAt, &st.Rating, &ratingManual, &synced); err != nil {
 		return ReadingState{}, err
 	}
+	st.RatingManual = ratingManual != 0
 	if t, err := time.Parse(time.RFC3339, synced); err == nil {
 		st.SyncedAt = t
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"github.com/agrison/reliure/internal/core"
 	"github.com/agrison/reliure/internal/device"
 	"github.com/agrison/reliure/internal/koreader"
+	"github.com/agrison/reliure/internal/koreaderstats"
 	"github.com/agrison/reliure/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -22,20 +24,23 @@ import (
 const (
 	calibreStatusEvent   = "calibre:status"
 	calibreProgressEvent = "calibre:progress"
+	readingStatsEvent    = "reading:statsUpdated"
 )
 
 func init() {
 	application.RegisterEvent[CalibreStatus](calibreStatusEvent)
 	application.RegisterEvent[CalibreSendProgress](calibreProgressEvent)
+	application.RegisterEvent[ReadingStatsFetch](readingStatsEvent)
 }
 
 // CalibreService controls the Calibre wireless (push) server that lets KOReader
 // connect over WiFi, and sends books to the connected device.
 type CalibreService struct {
-	db        *core.DB
-	settings  *settings.Store
-	server    *calibre.Server
-	inventory *device.Store
+	db               *core.DB
+	settings         *settings.Store
+	server           *calibre.Server
+	inventory        *device.Store
+	readingStatsPath string // where fetched reading stats are cached (JSON)
 }
 
 // CalibreStatus is the frontend-facing push-server state.
@@ -47,6 +52,10 @@ type CalibreStatus struct {
 	// Address is the LAN host:port KOReader can be pointed at manually if
 	// UDP auto-discovery does not work (e.g. across subnets).
 	Address string `json:"address"`
+	// LastDevice is the connected device name, or the last one seen when
+	// disconnected. It signals the UI that cached on-device presence is available
+	// (the `.reliure` inventory) even without a live connection.
+	LastDevice string `json:"lastDevice"`
 }
 
 // CalibreSendProgress is emitted once per book while sending to the device.
@@ -88,11 +97,16 @@ func (s *CalibreService) shutdown() { _ = s.server.Stop() }
 // Status returns the current push-server and connection state.
 func (s *CalibreService) Status() CalibreStatus {
 	name, connected := s.server.Device()
+	last := s.settings.Get().LastDeviceName
+	if connected && name != "" {
+		last = name
+	}
 	st := CalibreStatus{
-		Running:   s.server.Running(),
-		Connected: connected,
-		Device:    name,
-		Port:      s.server.Port(),
+		Running:    s.server.Running(),
+		Connected:  connected,
+		Device:     name,
+		LastDevice: last,
+		Port:       s.server.Port(),
 	}
 	if st.Running && st.Port > 0 {
 		host := firstLANIPv4()
@@ -104,13 +118,35 @@ func (s *CalibreService) Status() CalibreStatus {
 	return st
 }
 
-// BookStates returns per-book presence information for the connected device.
+// rememberDevice persists the name of a device that just connected, so the UI
+// can show its cached inventory after it disconnects.
+func (s *CalibreService) rememberDevice(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	cfg := s.settings.Get()
+	if cfg.LastDeviceName == name {
+		return
+	}
+	cfg.LastDeviceName = name
+	if _, err := s.settings.Update(cfg); err != nil {
+		slog.Warn("calibre: remember device failed", "device", name, "err", err)
+	}
+}
+
+// BookStates returns per-book presence information for the connected device, or
+// — when disconnected — for the last device seen, so the UI keeps showing which
+// books are on the reader from cache. Statuses refresh on the next connection.
 func (s *CalibreService) BookStates(ids []int64) ([]DeviceBookState, error) {
 	if s.inventory == nil {
 		return unknownStates(ids), nil
 	}
 	deviceName, connected := s.server.Device()
 	if !connected {
+		deviceName = s.settings.Get().LastDeviceName
+	}
+	if strings.TrimSpace(deviceName) == "" {
 		return unknownStates(ids), nil
 	}
 	inv, err := s.inventory.Load(deviceName)
@@ -261,6 +297,179 @@ func (s *CalibreService) SyncReadingFromDevice() (KoreaderSyncResult, error) {
 	return res, nil
 }
 
+// ReadingStatsProbe reports whether KOReader's statistics database could be
+// fetched over the Calibre connection, and from which relative path.
+type ReadingStatsProbe struct {
+	Found bool   `json:"found"`
+	Lpath string `json:"lpath"` // the candidate path that returned the file
+	Bytes int64  `json:"bytes"`
+	Valid bool   `json:"valid"` // true when the bytes start with the SQLite magic
+	Tried int    `json:"tried"`
+}
+
+// ProbeReadingStats tries to fetch KOReader's `statistics.sqlite3` over the live
+// connection. It lives under `koreader/settings/`, OUTSIDE the Calibre inbox, so
+// we probe a handful of relative paths (KOReader's GET_BOOK_FILE_SEGMENT resolves
+// them under the inbox with no sanitising, so `..` traversal may reach it). This
+// confirms feasibility on real hardware before we build the full stats feature.
+func (s *CalibreService) ProbeReadingStats() (ReadingStatsProbe, error) {
+	sess := s.server.Session()
+	if sess == nil {
+		return ReadingStatsProbe{}, errors.New("aucune liseuse connectée")
+	}
+	var res ReadingStatsProbe
+	for _, lp := range statisticsCandidates() {
+		res.Tried++
+		data, ok, err := sess.GetFile(lp)
+		if err != nil {
+			slog.Warn("calibre: stats probe failed", "lpath", lp, "err", err)
+			continue
+		}
+		if !ok {
+			continue
+		}
+		res.Found = true
+		res.Lpath = lp
+		res.Bytes = int64(len(data))
+		res.Valid = looksLikeSQLite(data)
+		slog.Info("calibre: stats probe hit", "lpath", lp, "bytes", res.Bytes, "valid", res.Valid)
+		return res, nil
+	}
+	slog.Info("calibre: stats probe found nothing", "tried", res.Tried)
+	return res, nil
+}
+
+// ReadingStatsFetch summarizes a fetch of the statistics database.
+type ReadingStatsFetch struct {
+	Found        bool   `json:"found"`
+	Lpath        string `json:"lpath"`
+	Bytes        int64  `json:"bytes"`
+	Tried        int    `json:"tried"`
+	Parsed       bool   `json:"parsed"`
+	TotalSeconds int64  `json:"totalSeconds"`
+	DaysRead     int    `json:"daysRead"`
+	Error        string `json:"error,omitempty"`
+}
+
+// FetchReadingStats fetches KOReader's statistics database over the live
+// connection (dynamic path search), computes the reading aggregates and caches
+// them so the dashboard can show them offline. Refreshed each time it runs.
+func (s *CalibreService) FetchReadingStats() (ReadingStatsFetch, error) {
+	sess := s.server.Session()
+	if sess == nil {
+		return ReadingStatsFetch{}, errors.New("aucune liseuse connectée")
+	}
+	var res ReadingStatsFetch
+	var data []byte
+	for _, lp := range statisticsCandidates() {
+		res.Tried++
+		d, ok, err := sess.GetFile(lp)
+		if err != nil {
+			slog.Warn("calibre: stats fetch failed", "lpath", lp, "err", err)
+			continue
+		}
+		if ok {
+			res.Found, res.Lpath, res.Bytes, data = true, lp, int64(len(d)), d
+			break
+		}
+	}
+	if !res.Found {
+		slog.Info("calibre: stats not found", "tried", res.Tried)
+		return res, nil
+	}
+	if !looksLikeSQLite(data) {
+		res.Error = "le fichier récupéré n'est pas une base SQLite"
+		return res, nil
+	}
+
+	tmp, err := os.CreateTemp("", "koreader-stats-*.sqlite3")
+	if err != nil {
+		return res, err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return res, err
+	}
+	if err := tmp.Close(); err != nil {
+		return res, err
+	}
+
+	stats, err := koreaderstats.Read(tmpPath)
+	if err != nil {
+		res.Error = err.Error()
+		return res, nil
+	}
+	stats.FetchedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := s.saveReadingStats(stats); err != nil {
+		res.Error = err.Error()
+		return res, nil
+	}
+	res.Parsed = true
+	res.TotalSeconds = stats.TotalSeconds
+	res.DaysRead = stats.DaysRead
+	slog.Info("calibre: reading stats fetched", "lpath", res.Lpath, "seconds", stats.TotalSeconds, "days", stats.DaysRead)
+	application.Get().Event.Emit(readingStatsEvent, res) // refresh an open dashboard
+	return res, nil
+}
+
+// autoFetchReadingStats fetches the reading statistics right after a device
+// connects, when the feature is enabled. Runs in the background so it never
+// delays the connection; a short pause lets the session settle first.
+func (s *CalibreService) autoFetchReadingStats() {
+	if !s.settings.Get().ReadingStatsEnabled {
+		return
+	}
+	time.Sleep(2 * time.Second)
+	if s.server.Session() == nil {
+		return // disconnected in the meantime
+	}
+	if _, err := s.FetchReadingStats(); err != nil {
+		slog.Warn("calibre: auto reading-stats fetch failed", "err", err)
+	}
+}
+
+// saveReadingStats caches the computed stats as JSON for the dashboard.
+func (s *CalibreService) saveReadingStats(stats *koreaderstats.ReadingStats) error {
+	if s.readingStatsPath == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(stats, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(s.readingStatsPath), 0o755); err != nil {
+		return err
+	}
+	tmp := s.readingStatsPath + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, s.readingStatsPath)
+}
+
+// statisticsCandidates are the relative paths under which KOReader's statistics
+// database might sit, depending on where the user pointed the Calibre inbox.
+func statisticsCandidates() []string {
+	const f = "statistics.sqlite3"
+	return []string{
+		"settings/" + f,                   // inbox == koreader dir
+		"../settings/" + f,                // inbox is a subdir of koreader (e.g. clipboard)
+		"../../settings/" + f,             // deeper subdir
+		"koreader/settings/" + f,          // inbox is the mount root
+		"../koreader/settings/" + f,       // inbox is a sibling of koreader (e.g. documents)
+		"../../koreader/settings/" + f,    // one level deeper
+		"../../../koreader/settings/" + f, // two levels deeper
+	}
+}
+
+// looksLikeSQLite checks the 16-byte SQLite file header.
+func looksLikeSQLite(data []byte) bool {
+	const magic = "SQLite format 3\x00"
+	return len(data) >= len(magic) && string(data[:len(magic)]) == magic
+}
+
 // fetchSidecar tries the KOReader sidecar path(s) for a sent book and returns
 // the first that exists on the device.
 func (s *CalibreService) fetchSidecar(sess *calibre.Session, e device.Entry) ([]byte, bool) {
@@ -285,6 +494,7 @@ func (s *CalibreService) applyDeviceReading(bookID int64, deviceName string, sc 
 		Status:     string(sc.Status),
 		Device:     deviceName,
 		LastReadAt: sc.ModifiedAt,
+		Rating:     sc.Rating,
 	}); err != nil {
 		return err
 	}

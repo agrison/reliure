@@ -84,19 +84,25 @@ func main() {
 	// as "calibre:status" events (full status, incl. port/address) so the
 	// sidebar reflects the connected reader.
 	inventoryStore := device.NewStore(filepath.Join(configDir, "devices"))
+	readingStatsPath := filepath.Join(configDir, "reading_stats.json")
 	calibreSvc := &CalibreService{
-		db:        db,
-		settings:  store,
-		inventory: inventoryStore,
+		db:               db,
+		settings:         store,
+		inventory:        inventoryStore,
+		readingStatsPath: readingStatsPath,
 	}
 	libSvc.calibre = calibreSvc
 	emitCalibreStatus := func() {
 		application.Get().Event.Emit(calibreStatusEvent, calibreSvc.Status())
 	}
 	calibreSvc.server = calibre.NewServer(calibre.ServerConfig{
-		LibraryName:  "Reliure",
-		LibraryUUID:  "reliure-library",
-		OnConnect:    func(string) { emitCalibreStatus() },
+		LibraryName: "Reliure",
+		LibraryUUID: "reliure-library",
+		OnConnect: func(name string) {
+			calibreSvc.rememberDevice(name)
+			emitCalibreStatus()
+			go calibreSvc.autoFetchReadingStats() // no-op unless the feature is on
+		},
 		OnDisconnect: func() { emitCalibreStatus() },
 	})
 	calibreSvc.startFromSettings()
@@ -113,7 +119,7 @@ func main() {
 			application.NewService(opdsSvc),
 			application.NewService(calibreSvc),
 			application.NewService(&KOReaderService{db: db, store: store}),
-			application.NewService(&StatsService{db: db, inventory: inventoryStore, settings: store}),
+			application.NewService(&StatsService{db: db, inventory: inventoryStore, settings: store, readingStatsPath: readingStatsPath}),
 		},
 		Assets: application.AssetOptions{
 			Handler: assetHandler(coverDir),

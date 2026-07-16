@@ -30,6 +30,10 @@ type Settings struct {
 	// CalibreEnabled controls whether the Calibre wireless (push) server starts
 	// with the app, so KOReader can connect to send/receive books.
 	CalibreEnabled bool `json:"calibreEnabled"`
+	// LastDeviceName is the name of the last KOReader device that connected. It
+	// lets the UI show cached on-device presence even after disconnection (the
+	// `.reliure` inventory persists on disk, keyed by this name).
+	LastDeviceName string `json:"lastDeviceName"`
 	// WriteMetadataToFile, when true, writes edited metadata back into the ebook
 	// file (rewrites the EPUB's OPF) on save, so readers that read the file
 	// directly (e.g. KOReader's file browser) see Reliure's values. Off by
@@ -66,6 +70,10 @@ type Settings struct {
 	// ContentSearchContext controls how much text is shown around content search
 	// matches: "minimal", "phrase" or "paragraph".
 	ContentSearchContext string `json:"contentSearchContext"`
+	// ReadingStatsEnabled opts into fetching KOReader's reading-statistics
+	// database (statistics.sqlite3) from the reader — off by default because it
+	// relies on reaching a file outside the Calibre inbox.
+	ReadingStatsEnabled bool `json:"readingStatsEnabled"`
 }
 
 // Store loads, exposes and persists Settings. Safe for concurrent use.

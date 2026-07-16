@@ -192,8 +192,12 @@ show the foreign-key links.
   from its `.sdr` sidecars): `percent` (0..1), `pages` (total pages of the device
   rendering, 0 = unknown; migration `0004`), `status`
   (reading/complete/abandoned/new), `device`, `last_read_at` (KOReader's
-  `summary.modified`, verbatim) and `synced_at` (RFC3339). Primary key `book_id`.
-  Indexed by `status` (sidebar reading filters).
+  `summary.modified`, verbatim), `rating` (KOReader `summary.rating`, 1..5, 0 =
+  unrated) with `rating_manual` (a rating set inside Reliure, protected from
+  device sync; migration `0008`) and `synced_at` (RFC3339). Primary key
+  `book_id`. Indexed by `status` (sidebar reading filters). Device sync merges
+  per field: progress advances only, and a manual rating is never overwritten
+  (KOReader only fills in an unrated book).
 - **`annotation`** — highlights and notes imported from KOReader: `text`,
   `note`, `chapter`, `drawer` (highlight style), `created_at` (device datetime)
   and a `dedup_key` with `UNIQUE (book_id, dedup_key)` so a re-sync is

@@ -53,6 +53,7 @@ type Sidecar struct {
 	TotalPages      int     // doc_pages / stats.pages, 0 when unknown
 	Status          Status
 	ModifiedAt      string // summary.modified, verbatim
+	Rating          int    // summary.rating, 1..5 (0 = unrated)
 	Annotations     []Annotation
 }
 
@@ -162,6 +163,7 @@ func (p *parser) parse(src string) (*Sidecar, error) {
 	if summary, ok := getTable(root, "summary"); ok {
 		sc.Status = normalizeStatus(getString(summary, "status"))
 		sc.ModifiedAt = getString(summary, "modified")
+		sc.Rating = clampRating(int(getNumber(summary, "rating")))
 	}
 	if props, ok := getTable(root, "doc_props"); ok {
 		sc.Title = getString(props, "title")
@@ -257,6 +259,17 @@ func getString(t *lua.LTable, key string) string {
 		return strings.TrimSpace(string(s))
 	}
 	return ""
+}
+
+// clampRating keeps a rating within KOReader's 0..5 range.
+func clampRating(n int) int {
+	if n < 0 {
+		return 0
+	}
+	if n > 5 {
+		return 5
+	}
+	return n
 }
 
 func getNumber(t *lua.LTable, key string) float64 {

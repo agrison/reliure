@@ -76,6 +76,13 @@ export function SetLanguage(language: string): $CancellablePromise<$models.AppSe
 }
 
 /**
+ * SetReadingStatsEnabled toggles fetching KOReader's reading-statistics database.
+ */
+export function SetReadingStatsEnabled(enabled: boolean): $CancellablePromise<$models.AppSettings> {
+    return $Call.ByID(3801578312, enabled);
+}
+
+/**
  * SetRemotePathTemplate stores the template used for future KOReader sends.
  */
 export function SetRemotePathTemplate(tmpl: string): $CancellablePromise<$models.AppSettings> {

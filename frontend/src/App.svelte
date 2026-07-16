@@ -77,6 +77,7 @@
   let opdsStatus = $state<OPDSStatus | null>(null);
   let calibre = $state<CalibreStatus | null>(null);
   let deviceStates = $state<Record<number, DeviceBookState>>({});
+  let deviceFilter = $state<"all" | "present" | "absent">("all");
   let readingStates = $state<Record<number, ReadingCard>>({});
   let readingCounts = $state<ReadingStatusCounts | null>(null);
   let annotationTotal = $state(0);
@@ -153,7 +154,9 @@
   }
 
   async function refreshDeviceStates(source = books) {
-    if (!calibre?.connected || source.length === 0) {
+    // Also fetch when disconnected but a reader was seen before: the `.reliure`
+    // inventory is cached on disk, so presence stays visible until the next sync.
+    if ((!calibre?.connected && !calibre?.lastDevice) || source.length === 0) {
       deviceStates = {};
       return;
     }
@@ -284,6 +287,7 @@
     browseMode = "books";
     parentBrowseMode = null;
     query = "";
+    deviceFilter = "all";
     clearSelection();
     if (v.kind === "quickedit") loadQuickEdit();
     else if (v.kind === "settings") loadSettings();
@@ -474,6 +478,16 @@
     }
   }
 
+  async function setRating(rating: number) {
+    if (!detail) return;
+    try {
+      detail = await LibraryService.SetReadingRating(detail.id, rating);
+    } catch (e) {
+      toast = `Enregistrement impossible · ${errorMessage(e)}`;
+      setTimeout(() => (toast = ""), 6000);
+    }
+  }
+
   async function applyOnlineMetadata(input: ApplyMetadataInput) {
     try {
       detail = await LibraryService.ApplyOnlineMetadata(input);
@@ -589,6 +603,12 @@
       toast = msg("toast.contentIndexStarted");
       setTimeout(() => (toast = ""), 5000);
     }
+  }
+  async function setReadingStatsEnabled(enabled: boolean) {
+    settings = await SettingsService.SetReadingStatsEnabled(enabled);
+  }
+  function fetchReadingStats() {
+    return CalibreService.FetchReadingStats();
   }
   async function setContentSearchContext(mode: "minimal" | "phrase" | "paragraph") {
     settings = await SettingsService.SetContentSearchContext(mode);
@@ -738,8 +758,19 @@
     if (!q) return source;
     return source.filter((item) => item.name.toLowerCase().includes(q));
   });
+  // A reader is known (connected now, or seen before) → its cached presence is
+  // available, so the on-device filter can be offered.
+  const hasDeviceData = $derived(!!(calibre?.connected || calibre?.lastDevice));
+  // Books after applying the on-device filter (present / absent / all).
+  const displayBooks = $derived.by(() => {
+    if (deviceFilter === "all") return books;
+    return books.filter((b) => {
+      const st = deviceStates[b.id]?.status;
+      return deviceFilter === "present" ? st === "present" : st === "absent";
+    });
+  });
   const visibleCount = $derived(
-    view.kind === "quickedit" ? quickRows.length : view.kind === "settings" || view.kind === "shelves" ? 0 : browseMode === "books" ? books.length : groupItems.length,
+    view.kind === "quickedit" ? quickRows.length : view.kind === "settings" || view.kind === "shelves" ? 0 : browseMode === "books" ? displayBooks.length : groupItems.length,
   );
 </script>
 
@@ -837,6 +868,16 @@
         </div>
       {/if}
 
+      {#if browseMode === "books" && hasDeviceData && view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
+        <div class="sort">
+          <select value={deviceFilter} onchange={(e) => (deviceFilter = (e.target as HTMLSelectElement).value as any)} aria-label={msg("view.filter.aria")}>
+            <option value="all">{msg("view.filter.all")}</option>
+            <option value="present">{msg("view.filter.onDevice")}</option>
+            <option value="absent">{msg("view.filter.offDevice")}</option>
+          </select>
+        </div>
+      {/if}
+
       {#if view.kind !== "quickedit" && view.kind !== "settings" && view.kind !== "gutenberg" && view.kind !== "annotations" && view.kind !== "contentOccurrences" && view.kind !== "dashboard" && view.kind !== "shelves"}
         <button class="import" onclick={doImport} disabled={importing}>
           {importing ? msg("view.importing") : msg("view.import")}
@@ -896,6 +937,8 @@
             onChooseKoreader={chooseKoreaderAndSync}
             onSyncKoreader={syncKoreader}
             onSyncKoreaderFromDevice={syncKoreaderFromDevice}
+            onSetReadingStatsEnabled={setReadingStatsEnabled}
+            onFetchReadingStats={fetchReadingStats}
             {syncingKoreader}
           />
         {:else}
@@ -956,8 +999,13 @@
             <p>{msg("view.noBookHere")}</p>
           {/if}
         </div>
+      {:else if displayBooks.length === 0}
+        <div class="empty">
+          <p>{msg("view.filterEmpty")}</p>
+          <button class="import" onclick={() => (deviceFilter = "all")}>{msg("view.filter.all")}</button>
+        </div>
       {:else}
-        <BookGrid {books} mode={viewMode} {selectedIds} {deviceStates} {readingStates} onOpen={openBook} onToggleSelect={toggleSelect} />
+        <BookGrid books={displayBooks} mode={viewMode} {selectedIds} {deviceStates} {readingStates} onOpen={openBook} onToggleSelect={toggleSelect} />
         {#if query.trim() && contentSnippets.length}
           <ContentResults snippets={contentSnippets} onOpen={openBook} onOpenOccurrences={openContentOccurrences} />
         {/if}
@@ -976,6 +1024,7 @@
     onSetAuthorSort={setAuthorSort}
     onFetchOnline={() => (matching = true)}
     onSetReading={setReading}
+    onSetRating={setRating}
   />
 {/if}
 

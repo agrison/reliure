@@ -16,6 +16,7 @@ declare module "@wailsio/runtime" {
             "calibre:status": main$0.CalibreStatus;
             "import:done": main$0.ImportSummary;
             "import:progress": main$0.ImportProgress;
+            "reading:statsUpdated": main$0.ReadingStatsFetch;
             "watch-folder:status": main$0.WatchFolderStatus;
         }
     }
